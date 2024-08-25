@@ -1,21 +1,24 @@
-use std::env::args;
+use std::{env::args, io::stdout, io::Write};
 mod error;
 mod scanner;
 mod token;
 mod token_type;
 use scanner::Scanner;
 use std::io::{self, BufRead};
-use token::Token;
+
 fn main() {
     let args: Vec<String> = args().collect();
-
-    if args.len() > 2 {
-        println!("Usage: lox-ast [script]");
-        std::process::exit(64);
-    } else if args.len() == 1 {
-        run_file(&args[0]);
-    } else {
-        run_prompt();
+    match args.len() {
+        1 => {
+            run_prompt();
+        }
+        2 => {
+            run_file(&args[1]).expect("could not run file");
+        }
+        _ => {
+            println!("Incorrect Usage: lox-ast [script]");
+            std::process::exit(64);
+        }
     }
 }
 
@@ -23,8 +26,7 @@ fn run_file(path: &str) -> io::Result<()> {
     let buf = std::fs::read_to_string(path)?;
     match run(buf) {
         Ok(_) => (),
-        Err(err) => {
-            err.report("".to_string());
+        Err(_) => {
             std::process::exit(65);
         }
     }
@@ -33,17 +35,17 @@ fn run_file(path: &str) -> io::Result<()> {
 }
 fn run_prompt() {
     let stdin = io::stdin();
-    print!(">");
+    print!("> ");
+    stdout().flush().unwrap();
     for line in stdin.lock().lines() {
         if let Ok(line) = line {
             if line.is_empty() {
                 break;
             }
-            match run(line) {
-                Ok(_) => (),
-                Err(err) => err.report("".to_string()),
-            }
+            let _ = run(line);
         }
+        print!("> ");
+        stdout().flush().unwrap();
     }
 }
 
