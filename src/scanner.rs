@@ -88,6 +88,8 @@ impl Scanner {
                     while self.peek() != '\n' && !self.is_at_end() {
                         self.advance();
                     }
+                } else if self.is_match('*') {
+                    self.scan_comment()?;
                 } else {
                     self.add_token(TokenType::Slash);
                 }
@@ -236,6 +238,38 @@ impl Scanner {
             "var" => Some(TokenType::Var),
             "while" => Some(TokenType::While),
             _ => None,
+        }
+    }
+
+    fn scan_comment(&mut self) -> Result<(), LoxError> {
+        loop {
+            match self.peek() {
+                '*' => {
+                    self.advance();
+                    if self.is_match('/') {
+                        return Ok(());
+                    }
+                }
+                '\n' => {
+                    self.line += 1;
+                    self.advance();
+                }
+                '/' => {
+                    self.advance();
+                    if self.is_match('*') {
+                        self.scan_comment()?; // we are calling the function recursively for the nested comment /* /*   */  */
+                    }
+                }
+                '\0' => {
+                    return Err(LoxError::new(
+                        self.line,
+                        "Unterminated comment.".to_string(),
+                    ));
+                }
+                _ => {
+                    self.advance();
+                }
+            }
         }
     }
 }
