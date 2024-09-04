@@ -8,6 +8,17 @@ pub enum Object {
     Bool(bool),
 }
 
+impl Object {
+    pub fn get_type(&self) -> String {
+        match self {
+            Object::String(_) => "string".to_string(),
+            Object::Number(_) => "number".to_string(),
+            Object::Nil => "nil".to_string(),
+            Object::Bool(_) => "bool".to_string(),
+            _ => "unknown".to_string(),
+        }
+    }
+}
 impl Display for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

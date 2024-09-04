@@ -12,16 +12,18 @@ mod interpreter;
 
 use scanner::Scanner;
 use std::io::{self, BufRead};
+use crate::interpreter::Interpreter;
 use crate::parser::Parser;
 
 fn main() {
     let args: Vec<String> = args().collect();
+    let lox = Lox::new();
     match args.len() {
         1 => {
-            run_prompt();
+            lox.run_prompt();
         }
         2 => {
-            run_file(&args[1]).expect("could not run file");
+            lox.run_file(&args[1]).expect("could not run file");
         }
         _ => {
             println!("Incorrect Usage: lox-ast [script]");
@@ -30,45 +32,60 @@ fn main() {
     }
 }
 
-fn run_file(path: &str) -> io::Result<()> {
-    let buf = std::fs::read_to_string(path)?;
-    match run(buf) {
-        Ok(_) => (),
-        Err(_) => {
-            std::process::exit(65);
+struct Lox {
+    interpreter: Interpreter,
+}
+
+impl Lox {
+    pub fn new() -> Self {
+        Lox {
+            interpreter: Interpreter::new(),
         }
     }
 
-    Ok(())
-}
-fn run_prompt() {
-    let stdin = io::stdin();
-    print!("> ");
-    stdout().flush().unwrap();
-    for line in stdin.lock().lines() {
-        if let Ok(line) = line {
-            if line.is_empty() {
-                break;
+
+    pub fn run_file(&self, path: &str) -> io::Result<()> {
+        let buf = std::fs::read_to_string(path)?;
+        match self.run(buf) {
+            Ok(_) => (),
+            Err(_) => {
+                std::process::exit(65);
             }
-            let _ = run(line);
         }
+
+        Ok(())
+    }
+    pub fn run_prompt(&self) {
+        let stdin = io::stdin();
         print!("> ");
         stdout().flush().unwrap();
+        for line in stdin.lock().lines() {
+            if let Ok(line) = line {
+                if line.is_empty() {
+                    break;
+                }
+                let _ = self.run(line);
+            }
+            print!("> ");
+            stdout().flush().unwrap();
+        }
     }
-}
 
-fn run(source: String) -> Result<(), error::LoxError> {
-    let mut scanner = Scanner::new(source);
-    let tokens = scanner.scan_tokens()?;
+    fn run(&self, source: String) -> Result<(), error::LoxError> {
+        let mut scanner = Scanner::new(source);
+        let tokens = scanner.scan_tokens()?;
 
-    let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens);
 
-    match parser.parse() {
-        Some(expr) => {
-            let printer = ast_printer::AstPrinter{};
-            println!("{}\n", printer.print(&expr)?);
-        },
-        None => return Ok(()),
+        match parser.parse() {
+            Some(expr) => {
+                let result= self.interpreter.interpret(&expr)?;
+                println!("{}", result);
+                // let printer = ast_printer::AstPrinter{};
+                // println!("{}\n", printer.print(&expr)?);
+            },
+            None => return Ok(()),
+        }
+        Ok(())
     }
-    Ok(())
 }

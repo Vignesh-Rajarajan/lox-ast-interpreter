@@ -34,13 +34,44 @@ impl ExprVisitor<Object> for Interpreter {
                 _ => Err(LoxError::new(expr.operator.line, "invalid expression:operands must be numbers")),
             }
 
-            TokenType::Greater => Ok(Object::Bool(left > right)),
-            TokenType::Less => Ok(Object::Bool(left < right)),
-            TokenType::GreaterEqual => Ok(Object::Bool(left >= right)),
-            TokenType::LessEqual => Ok(Object::Bool(left <= right)),
-            TokenType::BangEqual => Ok(Object::Bool(left != right)),
-            TokenType::EqualEqual => Ok(Object::Bool(left == right)),
-            _ => Err(LoxError::new(expr.operator.line, "invalid operator")),
+            TokenType::Greater => {
+                // if object are not of equal type return err
+                if left.get_type() != right.get_type() {
+                    return Err(LoxError::new(expr.operator.line, "invalid expression:operands are different types"));
+                }
+                Ok(Object::Bool(left > right))
+            }
+            TokenType::Less => {
+                if left.get_type() != right.get_type() {
+                    return Err(LoxError::new(expr.operator.line, "invalid expression:operands are different types"));
+                }
+                Ok(Object::Bool(left < right))
+            }
+            TokenType::GreaterEqual => {
+                if left.get_type() != right.get_type() {
+                    return Err(LoxError::new(expr.operator.line, "invalid expression:operands are different types"));
+                }
+                Ok(Object::Bool(left >= right))
+            }
+            TokenType::LessEqual => {
+                if left.get_type() != right.get_type() {
+                    return Err(LoxError::new(expr.operator.line, "invalid expression:operands are different types"));
+                }
+                Ok(Object::Bool(left <= right))
+            }
+            TokenType::BangEqual => {
+                if left.get_type() != right.get_type() {
+                    return Err(LoxError::new(expr.operator.line, "invalid expression:operands are different types"));
+                }
+                Ok(Object::Bool(left != right))
+            }
+            TokenType::EqualEqual => {
+                if left.get_type() != right.get_type() {
+                    return Err(LoxError::new(expr.operator.line, "invalid expression:operands are different types"));
+                }
+                Ok(Object::Bool(left == right))
+            }
+            _ => Err(LoxError::runtime_error(&expr.operator, "invalid operator")),
         }
     }
     fn visit_grouping_expr(&self, expr: &GroupingExpr) -> Result<Object, LoxError> {
@@ -69,11 +100,17 @@ impl ExprVisitor<Object> for Interpreter {
 }
 
 impl Interpreter {
+    pub fn new() -> Self {
+        Interpreter {}
+    }
     pub fn evaluate(&self, expr: &Expr) -> Result<Object, LoxError> {
         expr.accept(self)
     }
     fn is_truthy(&self, object: &Object) -> bool {
         !matches!(object,Object::Nil | Object::Bool(false))
+    }
+    pub fn interpret(&self, expr: &Expr) -> Result<Object, LoxError> {
+        self.evaluate(expr)
     }
 }
 
@@ -303,5 +340,17 @@ mod tests {
         let result = interpreter.visit_binary_expr(&binary_expr);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Object::Bool(true));
+    }
+    #[test]
+    fn test_binary_error_case() {
+        let binary_expr = BinaryExpr {
+            left: make_literal(Object::Number(4.0)),
+            operator: Token::new(TokenType::Greater, ">".to_string(), None, 1),
+            right: make_literal(Object::Bool(true)),
+        };
+
+        let interpreter = Interpreter {};
+        let result = interpreter.visit_binary_expr(&binary_expr);
+        assert!(result.is_err());
     }
 }

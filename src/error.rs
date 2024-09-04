@@ -20,6 +20,12 @@ impl LoxError {
         err.report("");
         err
     }
+    pub fn runtime_error(token: &Token, message: &str) -> Self {
+        let line = token.line;
+        let err = LoxError { token: Some(token.clone()), line, message:message.to_string() };
+        err.report("");
+        err
+    }
     pub fn report(&self, loc: &str) {
         if let Some(token) = &self.token {
             if token.ttype == TokenType::EOF {
