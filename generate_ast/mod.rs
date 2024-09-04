@@ -26,6 +26,7 @@ fn define_ast(output_dir: &str, base_name: &str, types: Vec<String>) -> io::Resu
     let mut tree_types = Vec::new();
     write!(file, "use crate::token::*;\n")?;
     write!(file, "use crate::error::*;\n")?;
+    write!(file, "use crate::object::*;\n")?;
     for type_def in types {
         let (base_class_name, args) = type_def.split_once(':').unwrap();
         let class_name = format!("{}{}", base_class_name.trim(), base_name);

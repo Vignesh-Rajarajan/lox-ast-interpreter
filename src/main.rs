@@ -7,6 +7,8 @@ mod token;
 mod token_type;
 
 mod ast_printer;
+mod object;
+mod interpreter;
 
 use scanner::Scanner;
 use std::io::{self, BufRead};

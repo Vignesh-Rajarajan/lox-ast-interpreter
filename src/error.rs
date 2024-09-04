@@ -9,18 +9,18 @@ pub struct LoxError {
 }
 
 impl LoxError {
-    pub fn new(line: usize, message: String) -> Self {
-        let err= LoxError { token: None, line, message };
-        err.report("".to_string());
+    pub fn new(line: usize, message: &str) -> Self {
+        let err= LoxError { token: None, line, message:message.to_string() };
+        err.report("");
         err
     }
-    pub fn pares_error(token: Token, message: String) -> Self {
+    pub fn pares_error(token: Token, message: &str) -> Self {
         let line = token.line;
-        let err = LoxError { token: Some(token), line, message };
-        err.report("".to_string());
+        let err = LoxError { token: Some(token), line, message:message.to_string() };
+        err.report("");
         err
     }
-    pub fn report(&self, loc: String) {
+    pub fn report(&self, loc: &str) {
         if let Some(token) = &self.token {
             if token.ttype == TokenType::EOF {
                 eprintln!("[line {}] Error at end: {}", self.line, self.message);

@@ -1,9 +1,10 @@
 use crate::error::LoxError;
 use crate::expr::Expr::Unary;
 use crate::expr::{BinaryExpr, Expr, GroupingExpr, LiteralExpr, UnaryExpr};
-use crate::token::{Object, Token};
+use crate::token::Token;
 use crate::token_type::TokenType;
 use Expr::Binary;
+use crate::object::Object;
 
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
@@ -142,13 +143,13 @@ impl<'a> Parser<'a> {
     fn primary(&mut self) -> Result<Expr, LoxError> {
         if self.is_match(&[TokenType::False]) {
             return Ok(Expr::Literal(LiteralExpr {
-                value: Some(Object::False),
+                value: Some(Object::Bool(false)),
             }));
         }
 
         if self.is_match(&[TokenType::True]) {
             return Ok(Expr::Literal(LiteralExpr {
-                value: Some(Object::True),
+                value: Some(Object::Bool(true))
             }));
         }
 
@@ -173,7 +174,7 @@ impl<'a> Parser<'a> {
         }
         Err(LoxError::new(
             self.peek().line,
-            "Expect expression.".to_string(),
+            "Expect expression.",
         ))
     }
     // consume checks if the current token matches the given token type
@@ -181,7 +182,7 @@ impl<'a> Parser<'a> {
         if self.check(ttype) {
             return Ok(self.advance());
         }
-        Err(Parser::error(self.peek().clone(), message.to_string()))
+        Err(Parser::error(self.peek().clone(), message))
     }
     // This method handles equality comparisons (== and !=).
     //It first parses a comparison expression, then checks for equality operators. If found, it creates a binary expression.
@@ -237,7 +238,7 @@ impl<'a> Parser<'a> {
         &self.tokens[self.current - 1]
     }
 
-    fn error(token: Token, message: String) -> LoxError {
+    fn error(token: Token, message: &str) -> LoxError {
         LoxError::pares_error(token, message)
     }
 

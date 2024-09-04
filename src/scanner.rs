@@ -1,5 +1,6 @@
 use crate::error::LoxError;
-use crate::token::{Object, Token};
+use crate::object::Object;
+use crate::token::Token;
 use crate::token_type::TokenType;
 pub struct Scanner {
     source: String,
@@ -27,7 +28,7 @@ impl Scanner {
             match self.scan_token() {
                 Ok(_) => (),
                 Err(err) => {
-                    err.report("".to_string());
+                    err.report("");
                     had_err = Some(err);
                 }
             }
@@ -106,7 +107,7 @@ impl Scanner {
                 } else {
                     return Err(LoxError::new(
                         self.line,
-                        "Unexpected character.".to_string(),
+                        "Unexpected character.",
                     ));
                 }
             }
@@ -122,7 +123,7 @@ impl Scanner {
             self.advance();
         }
         if self.is_at_end() {
-            return Err(LoxError::new(self.line, "Unterminated string.".to_string()));
+            return Err(LoxError::new(self.line, "Unterminated string."));
         }
         self.advance();
         let value = &self.source[self.start + 1..self.current - 1]; // +1 and -1 to remove the quotes
@@ -263,7 +264,7 @@ impl Scanner {
                 '\0' => {
                     return Err(LoxError::new(
                         self.line,
-                        "Unterminated comment.".to_string(),
+                        "Unterminated comment.",
                     ));
                 }
                 _ => {

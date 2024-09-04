@@ -1,5 +1,3 @@
-use std::ops::BitXorAssign;
-
 use crate::error::LoxError;
 use crate::expr::{BinaryExpr, Expr, ExprVisitor, GroupingExpr, LiteralExpr, UnaryExpr};
 pub(crate) struct AstPrinter;
@@ -9,6 +7,20 @@ impl AstPrinter {
         expr.accept(self)
     }
 
+    // let name = "*".to_string();
+    // let expr1 = Box::new(Expr::Literal(LiteralExpr { value: Some(Object::Number(4.0)) }));
+    // let expr2 = Box::new(Expr::Literal(LiteralExpr { value: Some(Object::Number(3.0)) }));
+    // let exprs = [&expr1, &expr2];
+    //
+    // let mult_result = ast_printer.parenthesize(name, &exprs);
+    // // Result: "(* 4 3)"
+    // For the unary minus:
+    // let name = "-".to_string();
+    // let expr = Box::new(Expr::Grouping(GroupingExpr { expression: Box::new(/* the multiplication expression */) }));
+    // let exprs = [&expr];
+    //
+    // let final_result = ast_printer.parenthesize(name, &exprs);
+    // // Result: "(- (* 4 3))"
     fn parenthesize(&self, name: String, exprs: &[&Box<Expr>]) -> Result<String, LoxError> {
         let mut builder = format!("({} ", name);
         for expr in exprs {
