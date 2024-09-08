@@ -1,5 +1,7 @@
 use crate::error::LoxError;
-use crate::expr::{AssignExpr, BinaryExpr, Expr, ExprVisitor, GroupingExpr, LiteralExpr, UnaryExpr, VariableExpr};
+use crate::expr::{
+    AssignExpr, BinaryExpr, Expr, ExprVisitor, GroupingExpr, LiteralExpr, UnaryExpr, VariableExpr,
+};
 pub(crate) struct AstPrinter;
 
 impl AstPrinter {

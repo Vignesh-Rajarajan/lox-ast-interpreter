@@ -105,10 +105,7 @@ impl Scanner {
                 if self.is_alpha_numeric(c) {
                     self.identifier()?;
                 } else {
-                    return Err(LoxError::new(
-                        self.line,
-                        "Unexpected character.",
-                    ));
+                    return Err(LoxError::new(self.line, "Unexpected character."));
                 }
             }
         }
@@ -262,10 +259,7 @@ impl Scanner {
                     }
                 }
                 '\0' => {
-                    return Err(LoxError::new(
-                        self.line,
-                        "Unterminated comment.",
-                    ));
+                    return Err(LoxError::new(self.line, "Unterminated comment."));
                 }
                 _ => {
                     self.advance();

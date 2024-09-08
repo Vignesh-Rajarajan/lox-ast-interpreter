@@ -1,11 +1,11 @@
-use std::cell::RefCell;
-use log::debug;
 use crate::environment::Environment;
 use crate::error::LoxError;
 use crate::expr::*;
 use crate::object::Object;
 use crate::stmt::{ExpressionStmt, PrintStmt, Stmt, StmtVisitor, VarStmt};
 use crate::token_type::TokenType;
+use log::debug;
+use std::cell::RefCell;
 
 pub struct Interpreter {
     environment: RefCell<Environment>,
@@ -21,14 +21,14 @@ impl Interpreter {
         expr.accept(self)
     }
     fn is_truthy(&self, object: &Object) -> bool {
-        !matches!(object,Object::Nil | Object::Bool(false))
+        !matches!(object, Object::Nil | Object::Bool(false))
     }
     pub fn interpret(&self, stmt: &[Stmt]) -> bool {
         let mut had_error = false;
         for statement in stmt {
             if let Err(e) = self.execute(statement) {
                 had_error = true;
-                e.report("");
+                break;
             }
         }
         had_error
@@ -52,11 +52,13 @@ impl StmtVisitor<()> for Interpreter {
 
     fn visit_var_stmt(&self, stmt: &VarStmt) -> Result<(), LoxError> {
         let value = if let Some(initializer) = &stmt.initializer {
-            self.evaluate(&initializer)?
+            self.evaluate(initializer)?
         } else {
             Object::Nil
         };
-        self.environment.borrow_mut().define(stmt.name.lexeme.to_string(), value);
+        self.environment
+            .borrow_mut()
+            .define(stmt.name.lexeme.to_string(), value);
         Ok(())
     }
 }
@@ -64,7 +66,9 @@ impl StmtVisitor<()> for Interpreter {
 impl ExprVisitor<Object> for Interpreter {
     fn visit_assign_expr(&self, expr: &AssignExpr) -> Result<Object, LoxError> {
         let value = self.evaluate(&expr.value)?;
-        self.environment.borrow_mut().assign(&expr.name, value.clone())?;
+        self.environment
+            .borrow_mut()
+            .assign(&expr.name, value.clone())?;
         Ok(value)
     }
 
@@ -74,14 +78,26 @@ impl ExprVisitor<Object> for Interpreter {
         match expr.operator.ttype {
             TokenType::Minus => match (left, right) {
                 (Object::Number(n1), Object::Number(n2)) => Ok(Object::Number(n1 - n2)),
-                _ => Err(LoxError::new(expr.operator.line, "invalid expression: operands must be two numbers")),
+                _ => Err(LoxError::new(
+                    expr.operator.line,
+                    "invalid expression: operands must be two numbers",
+                )),
             },
             TokenType::Plus => match (left, right) {
                 (Object::Number(n1), Object::Number(n2)) => Ok(Object::Number(n1 + n2)),
-                (Object::String(s1), Object::Number(n2)) => Ok(Object::String(format!("{}{}", s1, n2))),
-                (Object::Number(n1), Object::String(s2)) => Ok(Object::String(format!("{}{}", n1, s2))),
-                (Object::String(s1), Object::String(s2)) => Ok(Object::String(format!("{}{}", s1, s2))),
-                _ => Err(LoxError::new(expr.operator.line, "invalid expression:operands must be two numbers or two strings")),
+                (Object::String(s1), Object::Number(n2)) => {
+                    Ok(Object::String(format!("{}{}", s1, n2)))
+                }
+                (Object::Number(n1), Object::String(s2)) => {
+                    Ok(Object::String(format!("{}{}", n1, s2)))
+                }
+                (Object::String(s1), Object::String(s2)) => {
+                    Ok(Object::String(format!("{}{}", s1, s2)))
+                }
+                _ => Err(LoxError::new(
+                    expr.operator.line,
+                    "invalid expression:operands must be two numbers or two strings",
+                )),
             },
             TokenType::Slash => match (left, right) {
                 (Object::Number(n1), Object::Number(n2)) => {
@@ -91,47 +107,71 @@ impl ExprVisitor<Object> for Interpreter {
                         Ok(Object::Number(n1 / n2))
                     }
                 }
-                _ => Err(LoxError::new(expr.operator.line, "invalid expression:operands must be numbers")),
+                _ => Err(LoxError::new(
+                    expr.operator.line,
+                    "invalid expression:operands must be numbers",
+                )),
             },
             TokenType::Star => match (left, right) {
                 (Object::Number(n1), Object::Number(n2)) => Ok(Object::Number(n1 * n2)),
-                _ => Err(LoxError::new(expr.operator.line, "invalid expression:operands must be numbers")),
-            }
+                _ => Err(LoxError::new(
+                    expr.operator.line,
+                    "invalid expression:operands must be numbers",
+                )),
+            },
 
             TokenType::Greater => {
                 // if object are not of equal type return err
                 if left.get_type() != right.get_type() {
-                    return Err(LoxError::new(expr.operator.line, "invalid expression:operands are different types"));
+                    return Err(LoxError::new(
+                        expr.operator.line,
+                        "invalid expression:operands are different types",
+                    ));
                 }
                 Ok(Object::Bool(left > right))
             }
             TokenType::Less => {
                 if left.get_type() != right.get_type() {
-                    return Err(LoxError::new(expr.operator.line, "invalid expression:operands are different types"));
+                    return Err(LoxError::new(
+                        expr.operator.line,
+                        "invalid expression:operands are different types",
+                    ));
                 }
                 Ok(Object::Bool(left < right))
             }
             TokenType::GreaterEqual => {
                 if left.get_type() != right.get_type() {
-                    return Err(LoxError::new(expr.operator.line, "invalid expression:operands are different types"));
+                    return Err(LoxError::new(
+                        expr.operator.line,
+                        "invalid expression:operands are different types",
+                    ));
                 }
                 Ok(Object::Bool(left >= right))
             }
             TokenType::LessEqual => {
                 if left.get_type() != right.get_type() {
-                    return Err(LoxError::new(expr.operator.line, "invalid expression:operands are different types"));
+                    return Err(LoxError::new(
+                        expr.operator.line,
+                        "invalid expression:operands are different types",
+                    ));
                 }
                 Ok(Object::Bool(left <= right))
             }
             TokenType::BangEqual => {
                 if left.get_type() != right.get_type() {
-                    return Err(LoxError::new(expr.operator.line, "invalid expression:operands are different types"));
+                    return Err(LoxError::new(
+                        expr.operator.line,
+                        "invalid expression:operands are different types",
+                    ));
                 }
                 Ok(Object::Bool(left != right))
             }
             TokenType::EqualEqual => {
                 if left.get_type() != right.get_type() {
-                    return Err(LoxError::new(expr.operator.line, "invalid expression:operands are different types"));
+                    return Err(LoxError::new(
+                        expr.operator.line,
+                        "invalid expression:operands are different types",
+                    ));
                 }
                 Ok(Object::Bool(left == right))
             }
@@ -148,15 +188,13 @@ impl ExprVisitor<Object> for Interpreter {
     fn visit_unary_expr(&self, expr: &UnaryExpr) -> Result<Object, LoxError> {
         let right = self.evaluate(&expr.right)?;
         match expr.operator.ttype {
-            TokenType::Minus => {
-                match right {
-                    Object::Number(n) => Ok(Object::Number(-n)),
-                    _ => Err(LoxError::new(
-                        expr.operator.line,
-                        "Operand must be a number",
-                    )),
-                }
-            }
+            TokenType::Minus => match right {
+                Object::Number(n) => Ok(Object::Number(-n)),
+                _ => Err(LoxError::new(
+                    expr.operator.line,
+                    "Operand must be a number",
+                )),
+            },
             TokenType::Bang => Ok(Object::Bool(!self.is_truthy(&right))),
             _ => Err(LoxError::new(expr.operator.line, "unreachable")),
         }
@@ -167,16 +205,13 @@ impl ExprVisitor<Object> for Interpreter {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::token::Token;
     use super::*;
+    use crate::token::Token;
 
     fn make_literal(o: Object) -> Box<Expr> {
-        Box::new(Expr::Literal(LiteralExpr {
-            value: Some(o),
-        }))
+        Box::new(Expr::Literal(LiteralExpr { value: Some(o) }))
     }
 
     #[test]
@@ -228,7 +263,6 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Object::Number(7.0));
     }
-
 
     #[test]
     fn test_binary_addition_string() {
@@ -441,14 +475,18 @@ mod tests {
         };
         let result = interpreter.visit_var_stmt(&var_stmt);
         assert!(result.is_ok());
-        let var_expr = VariableExpr { name: Token::new(TokenType::Identifier, "a".to_string(), None, 1) };
+        let var_expr = VariableExpr {
+            name: Token::new(TokenType::Identifier, "a".to_string(), None, 1),
+        };
         let val = interpreter.visit_variable_expr(&var_expr);
         assert_eq!(val.unwrap(), Object::Number(4.0));
     }
     #[test]
     fn test_var_expr_undefined() {
         let interpreter = Interpreter::new();
-        let var_expr = VariableExpr { name: Token::new(TokenType::Identifier, "a".to_string(), None, 1) };
+        let var_expr = VariableExpr {
+            name: Token::new(TokenType::Identifier, "a".to_string(), None, 1),
+        };
         let val = interpreter.visit_variable_expr(&var_expr);
         assert!(val.is_err())
     }

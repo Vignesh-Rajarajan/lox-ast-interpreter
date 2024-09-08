@@ -1,4 +1,3 @@
-
 mod generate_ast;
 
 use generate_ast::generate_ast;

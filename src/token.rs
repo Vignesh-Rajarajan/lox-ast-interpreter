@@ -1,6 +1,6 @@
+use crate::object::Object;
 use crate::token_type::TokenType;
 use std::fmt::Display;
-use crate::object::Object;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Token {
@@ -21,7 +21,7 @@ impl Token {
     }
 
     pub fn eof(line: usize) -> Self {
-        Token::new(TokenType::EOF, "".to_string(), None, line)
+        Token::new(TokenType::Eof, "".to_string(), None, line)
     }
 }
 

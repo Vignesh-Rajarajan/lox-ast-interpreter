@@ -7,16 +7,16 @@ mod token;
 mod token_type;
 
 mod ast_printer;
-mod object;
-mod interpreter;
-mod stmt;
 mod environment;
+mod interpreter;
+mod object;
+mod stmt;
 
-use scanner::Scanner;
-use std::io::{self, BufRead};
 use crate::error::LoxError;
 use crate::interpreter::Interpreter;
 use crate::parser::Parser;
+use scanner::Scanner;
+use std::io::{self, BufRead};
 
 fn main() {
     let args: Vec<String> = args().collect();
@@ -45,7 +45,6 @@ impl Lox {
             interpreter: Interpreter::new(),
         }
     }
-
 
     pub fn run_file(&self, path: &str) -> io::Result<()> {
         let buf = std::fs::read_to_string(path)?;

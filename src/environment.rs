@@ -1,8 +1,8 @@
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
 use crate::error::LoxError;
 use crate::object::Object;
 use crate::token::Token;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 
 pub struct Environment {
     values: HashMap<String, Object>,
@@ -10,7 +10,9 @@ pub struct Environment {
 
 impl Environment {
     pub fn new() -> Self {
-        Environment { values: HashMap::new() }
+        Environment {
+            values: HashMap::new(),
+        }
     }
 
     pub fn define(&mut self, name: String, value: Object) {
@@ -21,7 +23,10 @@ impl Environment {
         if let Some(value) = self.values.get(name.lexeme.as_str()) {
             Ok(value.clone())
         } else {
-            Err(LoxError::runtime_error(name, format!("Undefined variable '{}'.", name).as_str()))
+            Err(LoxError::runtime_error(
+                name,
+                format!("Undefined variable '{}'.", name).as_str(),
+            ))
         }
     }
 
@@ -30,15 +35,18 @@ impl Environment {
             object.insert(value);
             Ok(())
         } else {
-            Err(LoxError::runtime_error(name, format!("Undefined variable '{}'.", name).as_str()))
+            Err(LoxError::runtime_error(
+                name,
+                format!("Undefined variable '{}'.", name).as_str(),
+            ))
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::token_type::TokenType;
     use super::*;
+    use crate::token_type::TokenType;
 
     #[test]
     fn test_define() {
@@ -73,7 +81,12 @@ mod tests {
     fn test_re_assign() {
         let mut env = Environment::new();
         env.define("a".to_string(), Object::Number(1.0));
-        assert!(env.assign(&Token::new(TokenType::Identifier, "a".to_string(), None, 0), Object::Bool(true)).is_ok());
+        assert!(env
+            .assign(
+                &Token::new(TokenType::Identifier, "a".to_string(), None, 0),
+                Object::Bool(true)
+            )
+            .is_ok());
         let result = env.get(&Token::new(TokenType::Identifier, "a".to_string(), None, 0));
         assert_eq!(result.unwrap(), Object::Bool(true));
     }
