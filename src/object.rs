@@ -15,12 +15,11 @@ impl Object {
             Object::Number(_) => "number".to_string(),
             Object::Nil => "nil".to_string(),
             Object::Bool(_) => "bool".to_string(),
-            _ => "unknown".to_string(),
         }
     }
 }
 impl Display for Object {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Object::String(s) => write!(f, "{}", s),
             Object::Number(n) => write!(f, "{}", n),

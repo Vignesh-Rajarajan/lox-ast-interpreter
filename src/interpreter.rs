@@ -1,11 +1,73 @@
+use std::cell::RefCell;
+use log::debug;
+use crate::environment::Environment;
 use crate::error::LoxError;
 use crate::expr::*;
 use crate::object::Object;
+use crate::stmt::{ExpressionStmt, PrintStmt, Stmt, StmtVisitor, VarStmt};
 use crate::token_type::TokenType;
 
-pub struct Interpreter {}
+pub struct Interpreter {
+    environment: RefCell<Environment>,
+}
+
+impl Interpreter {
+    pub fn new() -> Self {
+        Self {
+            environment: RefCell::from(Environment::new()),
+        }
+    }
+    pub fn evaluate(&self, expr: &Expr) -> Result<Object, LoxError> {
+        expr.accept(self)
+    }
+    fn is_truthy(&self, object: &Object) -> bool {
+        !matches!(object,Object::Nil | Object::Bool(false))
+    }
+    pub fn interpret(&self, stmt: &[Stmt]) -> bool {
+        let mut had_error = false;
+        for statement in stmt {
+            if let Err(e) = self.execute(statement) {
+                had_error = true;
+                e.report("");
+            }
+        }
+        had_error
+    }
+
+    fn execute(&self, stmt: &Stmt) -> Result<(), LoxError> {
+        stmt.accept(self)
+    }
+}
+impl StmtVisitor<()> for Interpreter {
+    fn visit_expression_stmt(&self, stmt: &ExpressionStmt) -> Result<(), LoxError> {
+        self.evaluate(&stmt.expression)?;
+        Ok(())
+    }
+
+    fn visit_print_stmt(&self, stmt: &PrintStmt) -> Result<(), LoxError> {
+        let value = self.evaluate(&stmt.expression)?;
+        println!("{:?}", value);
+        Ok(())
+    }
+
+    fn visit_var_stmt(&self, stmt: &VarStmt) -> Result<(), LoxError> {
+        let value = if let Some(initializer) = &stmt.initializer {
+            self.evaluate(&initializer)?
+        } else {
+            Object::Nil
+        };
+        self.environment.borrow_mut().define(stmt.name.lexeme.to_string(), value);
+        Ok(())
+    }
+}
 
 impl ExprVisitor<Object> for Interpreter {
+    fn visit_assign_expr(&self, expr: &AssignExpr) -> Result<Object, LoxError> {
+        let value = self.evaluate(&expr.value)?;
+        self.environment.borrow_mut().assign(&expr.name, value.clone())?;
+        Ok(value)
+    }
+
     fn visit_binary_expr(&self, expr: &BinaryExpr) -> Result<Object, LoxError> {
         let left = self.evaluate(&expr.left)?;
         let right = self.evaluate(&expr.right)?;
@@ -16,6 +78,8 @@ impl ExprVisitor<Object> for Interpreter {
             },
             TokenType::Plus => match (left, right) {
                 (Object::Number(n1), Object::Number(n2)) => Ok(Object::Number(n1 + n2)),
+                (Object::String(s1), Object::Number(n2)) => Ok(Object::String(format!("{}{}", s1, n2))),
+                (Object::Number(n1), Object::String(s2)) => Ok(Object::String(format!("{}{}", n1, s2))),
                 (Object::String(s1), Object::String(s2)) => Ok(Object::String(format!("{}{}", s1, s2))),
                 _ => Err(LoxError::new(expr.operator.line, "invalid expression:operands must be two numbers or two strings")),
             },
@@ -75,7 +139,7 @@ impl ExprVisitor<Object> for Interpreter {
         }
     }
     fn visit_grouping_expr(&self, expr: &GroupingExpr) -> Result<Object, LoxError> {
-        Ok(self.evaluate(&expr.expression)?)
+        self.evaluate(&expr.expression)
     }
     fn visit_literal_expr(&self, expr: &LiteralExpr) -> Result<Object, LoxError> {
         Ok(expr.value.clone().unwrap())
@@ -97,22 +161,12 @@ impl ExprVisitor<Object> for Interpreter {
             _ => Err(LoxError::new(expr.operator.line, "unreachable")),
         }
     }
+
+    fn visit_variable_expr(&self, expr: &VariableExpr) -> Result<Object, LoxError> {
+        self.environment.borrow().get(&expr.name)
+    }
 }
 
-impl Interpreter {
-    pub fn new() -> Self {
-        Interpreter {}
-    }
-    pub fn evaluate(&self, expr: &Expr) -> Result<Object, LoxError> {
-        expr.accept(self)
-    }
-    fn is_truthy(&self, object: &Object) -> bool {
-        !matches!(object,Object::Nil | Object::Bool(false))
-    }
-    pub fn interpret(&self, expr: &Expr) -> Result<Object, LoxError> {
-        self.evaluate(expr)
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -131,7 +185,7 @@ mod tests {
             operator: Token::new(TokenType::Minus, "-".to_string(), None, 1),
             right: make_literal(Object::Number(4.0)),
         };
-        let interpreter = Interpreter {};
+        let interpreter = Interpreter::new();
         let result = interpreter.visit_unary_expr(&expr);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Object::Number(-4.0));
@@ -142,7 +196,7 @@ mod tests {
             operator: Token::new(TokenType::Bang, "!".to_string(), None, 1),
             right: make_literal(Object::Bool(true)),
         };
-        let interpreter = Interpreter {};
+        let interpreter = Interpreter::new();
         let result = interpreter.visit_unary_expr(&expr);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Object::Bool(false));
@@ -156,7 +210,7 @@ mod tests {
             right: make_literal(Object::Number(3.0)),
         };
 
-        let interpreter = Interpreter {};
+        let interpreter = Interpreter::new();
         let result = interpreter.visit_binary_expr(&binary_expr);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Object::Number(1.0));
@@ -169,7 +223,7 @@ mod tests {
             right: make_literal(Object::Number(3.0)),
         };
 
-        let interpreter = Interpreter {};
+        let interpreter = Interpreter::new();
         let result = interpreter.visit_binary_expr(&binary_expr);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Object::Number(7.0));
@@ -188,7 +242,7 @@ mod tests {
             })),
         };
 
-        let interpreter = Interpreter {};
+        let interpreter = Interpreter::new();
         let result = interpreter.visit_binary_expr(&binary_expr);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Object::String("helloworld".to_string()));
@@ -202,7 +256,7 @@ mod tests {
             right: make_literal(Object::Number(2.0)),
         };
 
-        let interpreter = Interpreter {};
+        let interpreter = Interpreter::new();
         let result = interpreter.visit_binary_expr(&binary_expr);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Object::Number(2.0));
@@ -215,7 +269,7 @@ mod tests {
             right: make_literal(Object::Number(0.0)),
         };
 
-        let interpreter = Interpreter {};
+        let interpreter = Interpreter::new();
         let result = interpreter.visit_binary_expr(&binary_expr);
         assert!(result.is_err());
         println!("{:?}", result.err().unwrap());
@@ -228,7 +282,7 @@ mod tests {
             right: make_literal(Object::Number(2.0)),
         };
 
-        let interpreter = Interpreter {};
+        let interpreter = Interpreter::new();
         let result = interpreter.visit_binary_expr(&binary_expr);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Object::Number(8.0));
@@ -242,7 +296,7 @@ mod tests {
             right: make_literal(Object::Number(2.0)),
         };
 
-        let interpreter = Interpreter {};
+        let interpreter = Interpreter::new();
         let result = interpreter.visit_binary_expr(&binary_expr);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Object::Bool(true));
@@ -289,7 +343,7 @@ mod tests {
             })),
         };
 
-        let interpreter = Interpreter {};
+        let interpreter = Interpreter::new();
         let result = interpreter.visit_binary_expr(&binary_expr);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Object::Bool(true));
@@ -336,7 +390,7 @@ mod tests {
             })),
         };
 
-        let interpreter = Interpreter {};
+        let interpreter = Interpreter::new();
         let result = interpreter.visit_binary_expr(&binary_expr);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Object::Bool(true));
@@ -349,8 +403,53 @@ mod tests {
             right: make_literal(Object::Bool(true)),
         };
 
-        let interpreter = Interpreter {};
+        let interpreter = Interpreter::new();
         let result = interpreter.visit_binary_expr(&binary_expr);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_var_statement() {
+        let interpreter = Interpreter::new();
+        let var_stmt = VarStmt {
+            name: Token::new(TokenType::Identifier, "a".to_string(), None, 1),
+            initializer: Some(*make_literal(Object::Number(4.0))),
+        };
+        let result = interpreter.visit_var_stmt(&var_stmt);
+        assert!(result.is_ok());
+        let val = interpreter.environment.borrow().get(&var_stmt.name);
+        assert_eq!(val.unwrap(), Object::Number(4.0));
+    }
+    #[test]
+    fn test_var_statement_undefined() {
+        let interpreter = Interpreter::new();
+        let var_stmt = VarStmt {
+            name: Token::new(TokenType::Identifier, "a".to_string(), None, 1),
+            initializer: None,
+        };
+        let result = interpreter.visit_var_stmt(&var_stmt);
+        assert!(result.is_ok());
+        let val = interpreter.environment.borrow().get(&var_stmt.name);
+        assert_eq!(val.unwrap(), Object::Nil);
+    }
+    #[test]
+    fn test_var_expr() {
+        let interpreter = Interpreter::new();
+        let var_stmt = VarStmt {
+            name: Token::new(TokenType::Identifier, "a".to_string(), None, 1),
+            initializer: Some(*make_literal(Object::Number(4.0))),
+        };
+        let result = interpreter.visit_var_stmt(&var_stmt);
+        assert!(result.is_ok());
+        let var_expr = VariableExpr { name: Token::new(TokenType::Identifier, "a".to_string(), None, 1) };
+        let val = interpreter.visit_variable_expr(&var_expr);
+        assert_eq!(val.unwrap(), Object::Number(4.0));
+    }
+    #[test]
+    fn test_var_expr_undefined() {
+        let interpreter = Interpreter::new();
+        let var_expr = VariableExpr { name: Token::new(TokenType::Identifier, "a".to_string(), None, 1) };
+        let val = interpreter.visit_variable_expr(&var_expr);
+        assert!(val.is_err())
     }
 }

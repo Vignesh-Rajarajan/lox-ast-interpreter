@@ -1,4 +1,7 @@
-//this is a test file
-(( )){} // group
-!*+-/=<> <= == // operators
-"test" // string
+print "one";
+print true;
+print 2+1;
+var a = 1;
+print a;
+a = 2;
+print a;

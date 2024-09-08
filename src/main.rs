@@ -9,9 +9,12 @@ mod token_type;
 mod ast_printer;
 mod object;
 mod interpreter;
+mod stmt;
+mod environment;
 
 use scanner::Scanner;
 use std::io::{self, BufRead};
+use crate::error::LoxError;
 use crate::interpreter::Interpreter;
 use crate::parser::Parser;
 
@@ -74,18 +77,13 @@ impl Lox {
     fn run(&self, source: String) -> Result<(), error::LoxError> {
         let mut scanner = Scanner::new(source);
         let tokens = scanner.scan_tokens()?;
-
         let mut parser = Parser::new(tokens);
-
-        match parser.parse() {
-            Some(expr) => {
-                let result= self.interpreter.interpret(&expr)?;
-                println!("{}", result);
-                // let printer = ast_printer::AstPrinter{};
-                // println!("{}\n", printer.print(&expr)?);
-            },
-            None => return Ok(()),
+        let stmts = parser.parse()?;
+        println!("{}", parser.success());
+        if parser.success() && self.interpreter.interpret(&stmts) {
+            Ok(())
+        } else {
+            Err(LoxError::new(0, "could not interpret"))
         }
-        Ok(())
     }
 }
