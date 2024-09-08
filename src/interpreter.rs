@@ -26,7 +26,7 @@ impl Interpreter {
     pub fn interpret(&self, stmt: &[Stmt]) -> bool {
         let mut had_error = false;
         for statement in stmt {
-            if let Err(e) = self.execute(statement) {
+            if self.execute(statement).is_err() {
                 had_error = true;
                 break;
             }
