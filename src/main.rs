@@ -78,7 +78,6 @@ impl Lox {
         let tokens = scanner.scan_tokens()?;
         let mut parser = Parser::new(tokens);
         let stmts = parser.parse()?;
-        println!("{}", parser.success());
         if parser.success() && self.interpreter.interpret(&stmts) {
             Ok(())
         } else {

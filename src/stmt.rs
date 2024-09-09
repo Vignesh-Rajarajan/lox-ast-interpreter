@@ -2,6 +2,7 @@ use crate::error::*;
 use crate::expr::*;
 use crate::token::*;
 pub enum Stmt {
+    Block(BlockStmt),
     Expression(ExpressionStmt),
     Print(PrintStmt),
     Var(VarStmt),
@@ -9,11 +10,15 @@ pub enum Stmt {
 impl Stmt {
     pub fn accept<T>(&self, visitor: &dyn StmtVisitor<T>) -> Result<T, LoxError> {
         match self {
+            Stmt::Block(expr) => expr.accept(visitor),
             Stmt::Expression(expr) => expr.accept(visitor),
             Stmt::Print(expr) => expr.accept(visitor),
             Stmt::Var(expr) => expr.accept(visitor),
         }
     }
+}
+pub struct BlockStmt {
+    pub statements: Vec<Stmt>,
 }
 pub struct ExpressionStmt {
     pub expression: Expr,
@@ -26,9 +31,15 @@ pub struct VarStmt {
     pub initializer: Option<Expr>,
 }
 pub trait StmtVisitor<T> {
+    fn visit_block_stmt(&self, expr: &BlockStmt) -> Result<T,LoxError>;
     fn visit_expression_stmt(&self, expr: &ExpressionStmt) -> Result<T,LoxError>;
     fn visit_print_stmt(&self, expr: &PrintStmt) -> Result<T,LoxError>;
     fn visit_var_stmt(&self, expr: &VarStmt) -> Result<T,LoxError>;
+}
+impl BlockStmt {
+    pub fn accept<T>(&self, visitor: &dyn StmtVisitor<T>) -> Result<T, LoxError> {
+        visitor.visit_block_stmt(self)
+    }
 }
 impl ExpressionStmt {
     pub fn accept<T>(&self, visitor: &dyn StmtVisitor<T>) -> Result<T, LoxError> {

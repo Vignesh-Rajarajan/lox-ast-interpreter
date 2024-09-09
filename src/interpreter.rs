@@ -2,19 +2,30 @@ use crate::environment::Environment;
 use crate::error::LoxError;
 use crate::expr::*;
 use crate::object::Object;
-use crate::stmt::{ExpressionStmt, PrintStmt, Stmt, StmtVisitor, VarStmt};
+use crate::stmt::{BlockStmt, ExpressionStmt, PrintStmt, Stmt, StmtVisitor, VarStmt};
 use crate::token_type::TokenType;
-use log::debug;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 pub struct Interpreter {
-    environment: RefCell<Environment>,
+    //An environment typically stores variables and their values during program execution
+
+    environment: RefCell<Rc<RefCell<Environment>>>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Self {
-            environment: RefCell::from(Environment::new()),
+            // 1. The outermost RefCell allows for interior mutability,
+            //    meaning we can change the contents of this structure even if we only have a shared reference to it.
+            //    This is useful in situations where we need to modify the environment from different parts of the program.
+            // 2. Inner Rc allows multiple parts of the program to share ownership of the same environment.
+            //    When all references to this Rc are dropped, the memory it holds is automatically freed
+            // The outer doll (RefCell) can be opened by anyone holding it.
+            // Inside is a deed (Rc) that can be photocopied and shared.
+            // The deed protects another openable doll (inner RefCell).
+            // At the very center is your precious environment.
+            environment: RefCell::new(Rc::new(RefCell::new(Environment::new()))),
         }
     }
     pub fn evaluate(&self, expr: &Expr) -> Result<Object, LoxError> {
@@ -37,8 +48,26 @@ impl Interpreter {
     fn execute(&self, stmt: &Stmt) -> Result<(), LoxError> {
         stmt.accept(self)
     }
+
+    fn execute_block(&self, stmts: &[Stmt], environment: Environment) -> Result<(), LoxError> {
+        let previous = self.environment.replace(Rc::new(RefCell::new(environment)));
+        let mut result = Ok(());
+        for stmt in stmts {
+            result = self.execute(stmt);
+            if result.is_err() {
+                break;
+            }
+        }
+        self.environment.replace(previous);
+        result
+    }
 }
 impl StmtVisitor<()> for Interpreter {
+    fn visit_block_stmt(&self, stmt: &BlockStmt) -> Result<(), LoxError> {
+        let new_env = Environment::new_with_enclosing(self.environment.borrow().clone());
+        self.execute_block(&stmt.statements, new_env)
+    }
+
     fn visit_expression_stmt(&self, stmt: &ExpressionStmt) -> Result<(), LoxError> {
         self.evaluate(&stmt.expression)?;
         Ok(())
@@ -46,7 +75,7 @@ impl StmtVisitor<()> for Interpreter {
 
     fn visit_print_stmt(&self, stmt: &PrintStmt) -> Result<(), LoxError> {
         let value = self.evaluate(&stmt.expression)?;
-        println!("{:?}", value);
+        println!("{:?}", value.to_string());
         Ok(())
     }
 
@@ -56,7 +85,7 @@ impl StmtVisitor<()> for Interpreter {
         } else {
             Object::Nil
         };
-        self.environment
+        self.environment.borrow()
             .borrow_mut()
             .define(stmt.name.lexeme.to_string(), value);
         Ok(())
@@ -67,6 +96,7 @@ impl ExprVisitor<Object> for Interpreter {
     fn visit_assign_expr(&self, expr: &AssignExpr) -> Result<Object, LoxError> {
         let value = self.evaluate(&expr.value)?;
         self.environment
+            .borrow()
             .borrow_mut()
             .assign(&expr.name, value.clone())?;
         Ok(value)
@@ -201,7 +231,7 @@ impl ExprVisitor<Object> for Interpreter {
     }
 
     fn visit_variable_expr(&self, expr: &VariableExpr) -> Result<Object, LoxError> {
-        self.environment.borrow().get(&expr.name)
+        self.environment.borrow().borrow().get(&expr.name)
     }
 }
 
@@ -451,7 +481,7 @@ mod tests {
         };
         let result = interpreter.visit_var_stmt(&var_stmt);
         assert!(result.is_ok());
-        let val = interpreter.environment.borrow().get(&var_stmt.name);
+        let val = interpreter.environment.borrow().borrow().get(&var_stmt.name);
         assert_eq!(val.unwrap(), Object::Number(4.0));
     }
     #[test]
@@ -463,7 +493,7 @@ mod tests {
         };
         let result = interpreter.visit_var_stmt(&var_stmt);
         assert!(result.is_ok());
-        let val = interpreter.environment.borrow().get(&var_stmt.name);
+        let val = interpreter.environment.borrow().borrow().get(&var_stmt.name);
         assert_eq!(val.unwrap(), Object::Nil);
     }
     #[test]

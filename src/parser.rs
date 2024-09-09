@@ -4,7 +4,7 @@ use crate::expr::{
     AssignExpr, BinaryExpr, Expr, GroupingExpr, LiteralExpr, UnaryExpr, VariableExpr,
 };
 use crate::object::Object;
-use crate::stmt::{ExpressionStmt, PrintStmt, Stmt, VarStmt};
+use crate::stmt::{BlockStmt, ExpressionStmt, PrintStmt, Stmt, VarStmt};
 use crate::token::Token;
 use crate::token_type::TokenType;
 use Expr::Binary;
@@ -92,6 +92,10 @@ impl<'a> Parser<'a> {
         if self.is_match(&[TokenType::Print]) {
             return self.print_statement();
         }
+        if self.is_match(&[TokenType::LeftBrace]) {
+            let statements = self.block()?;
+            return Ok(Stmt::Block(BlockStmt { statements }));
+        }
         self.expression_statement()
     }
 
@@ -139,6 +143,15 @@ impl<'a> Parser<'a> {
         let expr = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
         Ok(Stmt::Expression(ExpressionStmt { expression: expr }))
+    }
+
+    fn block(&mut self) -> Result<Vec<Stmt>, LoxError> {
+        let mut statements = Vec::new();
+        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
+            statements.push(self.declaration()?)
+        }
+        self.consume(TokenType::RightBrace, "expect '}' after block.")?;
+        Ok(statements)
     }
 
     // This method handles comparison operators (>, >=, <, <=). It works similarly to equality() but for comparison operators.
