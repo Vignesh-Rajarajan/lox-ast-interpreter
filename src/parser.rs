@@ -1,8 +1,10 @@
 use crate::error::LoxError;
-use crate::expr::Expr::Unary;
-use crate::expr::{AssignExpr, BinaryExpr, Expr, GroupingExpr, LiteralExpr, LogicalExpr, UnaryExpr, VariableExpr};
+use crate::expr::Expr::{Literal, Unary};
+use crate::expr::{
+    AssignExpr, BinaryExpr, Expr, GroupingExpr, LiteralExpr, LogicalExpr, UnaryExpr, VariableExpr,
+};
 use crate::object::Object;
-use crate::stmt::{BlockStmt, ExpressionStmt, IfStmt, PrintStmt, Stmt, VarStmt};
+use crate::stmt::{BlockStmt, ExpressionStmt, IfStmt, PrintStmt, Stmt, VarStmt, WhileStmt};
 use crate::token::Token;
 use crate::token_type::TokenType;
 use Expr::Binary;
@@ -87,11 +89,19 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&mut self) -> Result<Stmt, LoxError> {
+        if self.is_match(&[TokenType::For]) {
+            return self.for_statement();
+        }
+
+        if self.is_match(&[TokenType::If]) {
+            return self.if_statement();
+        }
         if self.is_match(&[TokenType::Print]) {
             return self.print_statement();
         }
-        if self.is_match(&[TokenType::If]) {
-            return self.if_statement();
+
+        if self.is_match(&[TokenType::While]) {
+            return self.while_statement();
         }
         if self.is_match(&[TokenType::LeftBrace]) {
             let statements = self.block()?;
@@ -100,6 +110,51 @@ impl<'a> Parser<'a> {
         self.expression_statement()
     }
 
+    fn for_statement(&mut self) -> Result<Stmt, LoxError> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'for'.")?;
+
+        let initializer = if self.is_match(&[TokenType::Semicolon]) {
+            None
+        } else if self.is_match(&[TokenType::Var]) {
+            Some(self.var_declaration()?)
+        } else {
+            Some(self.expression_statement()?)
+        };
+        let condition = if !self.check(TokenType::Semicolon) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+        self.consume(TokenType::Semicolon, "Expect ';' after loop condition.")?;
+
+        let increment = if !self.check(TokenType::RightParen) {
+            Some(self.expression()?)
+        } else { None };
+
+        self.consume(TokenType::RightParen, "Expect ')' after for clauses.")?;
+        let mut body = self.statement()?;
+
+        if let Some(increment) = increment {
+            body = Stmt::Block(BlockStmt {
+                statements: vec![body, Stmt::Expression(ExpressionStmt { expression: increment })]
+            });
+        }
+        body = Stmt::While(WhileStmt {
+            condition: if let Some(condition) = condition {
+                condition
+            } else {
+                Literal(LiteralExpr { value: Some(Object::Bool(true)) })
+            },
+            body: Box::new(body),
+        });
+
+        if let Some(initializer) = initializer {
+            body = Stmt::Block(BlockStmt {
+                statements: vec![initializer, body]
+            });
+        }
+        Ok(body)
+    }
     fn if_statement(&mut self) -> Result<Stmt, LoxError> {
         self.consume(TokenType::LeftParen, "Expect '(' after 'if'.")?;
         let condition = self.expression()?;
@@ -115,6 +170,17 @@ impl<'a> Parser<'a> {
             condition,
             then_branch: Box::new(then_branch),
             else_branch,
+        }))
+    }
+
+    fn while_statement(&mut self) -> Result<Stmt, LoxError> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'while'.")?;
+        let condition = self.expression()?;
+        self.consume(TokenType::RightParen, "Expect ')' after 'while'.")?;
+        let body = self.statement()?;
+        Ok(Stmt::While(WhileStmt {
+            condition,
+            body: Box::new(body),
         }))
     }
 
@@ -311,7 +377,7 @@ impl<'a> Parser<'a> {
                 name: self.previous().clone(),
             }));
         }
-        Err(LoxError::new(self.peek().line, "Expect expression."))
+        Err(LoxError::pares_error(self.peek().clone(), "Expect expression."))
     }
     // consume checks if the current token matches the given token type
     fn consume(&mut self, ttype: TokenType, message: &str) -> Result<&Token, LoxError> {
@@ -408,7 +474,6 @@ impl<'a> Parser<'a> {
             ) {
                 return;
             }
-
             self.advance();
         }
     }

@@ -2,7 +2,7 @@ use crate::environment::Environment;
 use crate::error::LoxError;
 use crate::expr::*;
 use crate::object::Object;
-use crate::stmt::{BlockStmt, ExpressionStmt, IfStmt, PrintStmt, Stmt, StmtVisitor, VarStmt};
+use crate::stmt::{BlockStmt, ExpressionStmt, IfStmt, PrintStmt, Stmt, StmtVisitor, VarStmt, WhileStmt};
 use crate::token_type::TokenType;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -98,6 +98,13 @@ impl StmtVisitor<()> for Interpreter {
             .borrow()
             .borrow_mut()
             .define(stmt.name.lexeme.to_string(), value);
+        Ok(())
+    }
+
+    fn visit_while_stmt(&self, stmt: &WhileStmt) -> Result<(), LoxError> {
+        while self.is_truthy(&self.evaluate(&stmt.condition)?) {
+            self.execute(&stmt.body)?;
+        }
         Ok(())
     }
 }
@@ -231,10 +238,8 @@ impl ExprVisitor<Object> for Interpreter {
             if self.is_truthy(&left) {
                 return Ok(left);
             }
-        } else {
-            if !self.is_truthy(&left) {
-                return Ok(left);
-            }
+        } else if !self.is_truthy(&left) {
+            return Ok(left);
         }
         self.evaluate(&expr.right)
     }
