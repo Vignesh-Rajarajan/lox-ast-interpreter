@@ -1,7 +1,7 @@
-use std::cell::RefCell;
 use crate::error::LoxError;
 use crate::object::Object;
 use crate::token::Token;
+use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -116,7 +116,8 @@ mod tests {
     #[test]
     fn can_read_from_enclosing_environment() {
         let env = Rc::new(RefCell::new(Environment::new()));
-        env.borrow_mut().define("a".to_string(), Object::Number(1.0));
+        env.borrow_mut()
+            .define("a".to_string(), Object::Number(1.0));
         let env2 = Environment::new_with_enclosing(Rc::clone(&env));
         assert!(env2.enclosing.is_some());
         let result = env2.get(&Token::new(TokenType::Identifier, "a".to_string(), None, 0));
@@ -125,13 +126,11 @@ mod tests {
     #[test]
     fn can_assign_to_enclosing_environment() {
         let env = Rc::new(RefCell::new(Environment::new()));
-        env.borrow_mut().define("a".to_string(), Object::Number(1.0));
+        env.borrow_mut()
+            .define("a".to_string(), Object::Number(1.0));
         let mut env2 = Environment::new_with_enclosing(Rc::clone(&env));
         let token = Token::new(TokenType::Identifier, "a".to_string(), None, 0);
-        let assign_result = env2.assign(
-            &token,
-            Object::Number(92.0),
-        );
+        let assign_result = env2.assign(&token, Object::Number(92.0));
         assert!(assign_result.is_ok());
         let result = env2.get(&token);
         assert_eq!(result.unwrap(), Object::Number(92.0));

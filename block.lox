@@ -17,3 +17,19 @@ var c = "global c";
  print a;
  print b;
  print c;
+ var x = 1;
+ {
+ var x = x+1;
+ print x;
+ }
+ print x;
+ if(4>3) {
+   print "true";
+ } else {
+   print "false";
+ }
+  if(2>3) {
+    print "true";
+  } else {
+    print "false";
+  }

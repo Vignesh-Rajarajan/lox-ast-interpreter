@@ -1,10 +1,8 @@
 use crate::error::LoxError;
 use crate::expr::Expr::Unary;
-use crate::expr::{
-    AssignExpr, BinaryExpr, Expr, GroupingExpr, LiteralExpr, UnaryExpr, VariableExpr,
-};
+use crate::expr::{AssignExpr, BinaryExpr, Expr, GroupingExpr, LiteralExpr, LogicalExpr, UnaryExpr, VariableExpr};
 use crate::object::Object;
-use crate::stmt::{BlockStmt, ExpressionStmt, PrintStmt, Stmt, VarStmt};
+use crate::stmt::{BlockStmt, ExpressionStmt, IfStmt, PrintStmt, Stmt, VarStmt};
 use crate::token::Token;
 use crate::token_type::TokenType;
 use Expr::Binary;
@@ -92,6 +90,9 @@ impl<'a> Parser<'a> {
         if self.is_match(&[TokenType::Print]) {
             return self.print_statement();
         }
+        if self.is_match(&[TokenType::If]) {
+            return self.if_statement();
+        }
         if self.is_match(&[TokenType::LeftBrace]) {
             let statements = self.block()?;
             return Ok(Stmt::Block(BlockStmt { statements }));
@@ -99,8 +100,26 @@ impl<'a> Parser<'a> {
         self.expression_statement()
     }
 
+    fn if_statement(&mut self) -> Result<Stmt, LoxError> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.")?;
+        let condition = self.expression()?;
+        self.consume(TokenType::RightParen, "Expect '(' after 'if'.")?;
+
+        let then_branch = self.statement()?;
+        let else_branch = if self.is_match(&[TokenType::Else]) {
+            Some(Box::new(self.statement()?))
+        } else {
+            None
+        };
+        Ok(Stmt::If(IfStmt {
+            condition,
+            then_branch: Box::new(then_branch),
+            else_branch,
+        }))
+    }
+
     fn assignment(&mut self) -> Result<Expr, LoxError> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
 
         if self.is_match(&[TokenType::Equal]) {
             let equals = self.previous().clone();
@@ -112,6 +131,35 @@ impl<'a> Parser<'a> {
                 }));
             }
             return Err(self.error(equals, "Invalid assignment target."));
+        }
+        Ok(expr)
+    }
+
+    fn or(&mut self) -> Result<Expr, LoxError> {
+        let mut expr = self.and()?;
+
+        while self.is_match(&[TokenType::Or]) {
+            let operator = self.previous().clone();
+            let right = self.and()?;
+            expr = Expr::Logical(LogicalExpr {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            });
+        }
+        Ok(expr)
+    }
+    fn and(&mut self) -> Result<Expr, LoxError> {
+        let mut expr = self.equality()?;
+
+        while self.is_match(&[TokenType::And]) {
+            let operator = self.previous().clone();
+            let right = self.equality()?;
+            expr = Expr::Logical(LogicalExpr {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            });
         }
         Ok(expr)
     }

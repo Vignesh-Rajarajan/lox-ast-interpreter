@@ -2,14 +2,13 @@ use crate::environment::Environment;
 use crate::error::LoxError;
 use crate::expr::*;
 use crate::object::Object;
-use crate::stmt::{BlockStmt, ExpressionStmt, PrintStmt, Stmt, StmtVisitor, VarStmt};
+use crate::stmt::{BlockStmt, ExpressionStmt, IfStmt, PrintStmt, Stmt, StmtVisitor, VarStmt};
 use crate::token_type::TokenType;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 pub struct Interpreter {
     //An environment typically stores variables and their values during program execution
-
     environment: RefCell<Rc<RefCell<Environment>>>,
 }
 
@@ -68,6 +67,16 @@ impl StmtVisitor<()> for Interpreter {
         self.execute_block(&stmt.statements, new_env)
     }
 
+    fn visit_if_stmt(&self, stmt: &IfStmt) -> Result<(), LoxError> {
+        if self.is_truthy(&self.evaluate(&stmt.condition)?) {
+            self.execute(&stmt.then_branch)
+        } else if let Some(else_branch) = &stmt.else_branch {
+            self.execute(else_branch)
+        } else {
+            Ok(())
+        }
+    }
+
     fn visit_expression_stmt(&self, stmt: &ExpressionStmt) -> Result<(), LoxError> {
         self.evaluate(&stmt.expression)?;
         Ok(())
@@ -85,7 +94,8 @@ impl StmtVisitor<()> for Interpreter {
         } else {
             Object::Nil
         };
-        self.environment.borrow()
+        self.environment
+            .borrow()
             .borrow_mut()
             .define(stmt.name.lexeme.to_string(), value);
         Ok(())
@@ -214,6 +224,21 @@ impl ExprVisitor<Object> for Interpreter {
     fn visit_literal_expr(&self, expr: &LiteralExpr) -> Result<Object, LoxError> {
         Ok(expr.value.clone().unwrap())
     }
+
+    fn visit_logical_expr(&self, expr: &LogicalExpr) -> Result<Object, LoxError> {
+        let left = self.evaluate(&expr.left)?;
+        if expr.operator.ttype == TokenType::Or {
+            if self.is_truthy(&left) {
+                return Ok(left);
+            }
+        } else {
+            if !self.is_truthy(&left) {
+                return Ok(left);
+            }
+        }
+        self.evaluate(&expr.right)
+    }
+
     // for example: -1
     fn visit_unary_expr(&self, expr: &UnaryExpr) -> Result<Object, LoxError> {
         let right = self.evaluate(&expr.right)?;
@@ -481,7 +506,11 @@ mod tests {
         };
         let result = interpreter.visit_var_stmt(&var_stmt);
         assert!(result.is_ok());
-        let val = interpreter.environment.borrow().borrow().get(&var_stmt.name);
+        let val = interpreter
+            .environment
+            .borrow()
+            .borrow()
+            .get(&var_stmt.name);
         assert_eq!(val.unwrap(), Object::Number(4.0));
     }
     #[test]
@@ -493,7 +522,11 @@ mod tests {
         };
         let result = interpreter.visit_var_stmt(&var_stmt);
         assert!(result.is_ok());
-        let val = interpreter.environment.borrow().borrow().get(&var_stmt.name);
+        let val = interpreter
+            .environment
+            .borrow()
+            .borrow()
+            .get(&var_stmt.name);
         assert_eq!(val.unwrap(), Object::Nil);
     }
     #[test]
