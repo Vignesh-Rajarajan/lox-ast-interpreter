@@ -1,4 +1,4 @@
-use crate::error::LoxError;
+use crate::error::{LoxResult};
 use crate::object::Object;
 use crate::token::Token;
 use crate::token_type::TokenType;
@@ -21,14 +21,13 @@ impl Scanner {
         }
     }
 
-    pub fn scan_tokens(&mut self) -> Result<&Vec<Token>, LoxError> {
-        let mut had_err: Option<LoxError> = None;
+    pub fn scan_tokens(&mut self) -> Result<&Vec<Token>, LoxResult> {
+        let mut had_err: Option<LoxResult> = None;
         while !self.is_at_end() {
             self.start = self.current;
             match self.scan_token() {
                 Ok(_) => (),
                 Err(err) => {
-                    err.report("");
                     had_err = Some(err);
                 }
             }
@@ -43,7 +42,7 @@ impl Scanner {
     pub fn is_at_end(&self) -> bool {
         self.current >= self.source.len()
     }
-    pub fn scan_token(&mut self) -> Result<(), LoxError> {
+    pub fn scan_token(&mut self) -> Result<(), LoxResult> {
         let c = self.advance();
         match c {
             '(' => self.add_token(TokenType::LeftParen),
@@ -105,14 +104,14 @@ impl Scanner {
                 if self.is_alpha_numeric(c) {
                     self.identifier()?;
                 } else {
-                    return Err(LoxError::new(self.line, "Unexpected character."));
+                    return Err(LoxResult::new(self.line, "Unexpected character."));
                 }
             }
         }
         Ok(())
     }
 
-    fn string(&mut self) -> Result<(), LoxError> {
+    fn string(&mut self) -> Result<(), LoxResult> {
         while self.peek() != '"' && !self.is_at_end() {
             if self.peek() == '\n' {
                 self.line += 1;
@@ -120,7 +119,7 @@ impl Scanner {
             self.advance();
         }
         if self.is_at_end() {
-            return Err(LoxError::new(self.line, "Unterminated string."));
+            return Err(LoxResult::new(self.line, "Unterminated string."));
         }
         self.advance();
         let value = &self.source[self.start + 1..self.current - 1]; // +1 and -1 to remove the quotes
@@ -169,7 +168,7 @@ impl Scanner {
         self.source.chars().nth(self.current).unwrap()
     }
 
-    fn number(&mut self) -> Result<(), LoxError> {
+    fn number(&mut self) -> Result<(), LoxResult> {
         while self.is_digit(self.peek()) {
             self.advance();
         }
@@ -188,7 +187,7 @@ impl Scanner {
         Ok(())
     }
 
-    fn identifier(&mut self) -> Result<(), LoxError> {
+    fn identifier(&mut self) -> Result<(), LoxResult> {
         while self.is_alpha_numeric(self.peek()) {
             self.advance();
         }
@@ -235,11 +234,12 @@ impl Scanner {
             "true" => Some(TokenType::True),
             "var" => Some(TokenType::Var),
             "while" => Some(TokenType::While),
+            "break" => Some(TokenType::Break),
             _ => None,
         }
     }
 
-    fn scan_comment(&mut self) -> Result<(), LoxError> {
+    fn scan_comment(&mut self) -> Result<(), LoxResult> {
         loop {
             match self.peek() {
                 '*' => {
@@ -259,7 +259,7 @@ impl Scanner {
                     }
                 }
                 '\0' => {
-                    return Err(LoxError::new(self.line, "Unterminated comment."));
+                    return Err(LoxResult::new(self.line, "Unterminated comment."));
                 }
                 _ => {
                     self.advance();

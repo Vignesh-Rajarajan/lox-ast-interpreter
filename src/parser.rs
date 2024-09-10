@@ -1,10 +1,10 @@
-use crate::error::LoxError;
+use crate::error::{LoxResult};
 use crate::expr::Expr::{Literal, Unary};
 use crate::expr::{
     AssignExpr, BinaryExpr, Expr, GroupingExpr, LiteralExpr, LogicalExpr, UnaryExpr, VariableExpr,
 };
 use crate::object::Object;
-use crate::stmt::{BlockStmt, ExpressionStmt, IfStmt, PrintStmt, Stmt, VarStmt, WhileStmt};
+use crate::stmt::{BlockStmt, BreakStmt, ExpressionStmt, IfStmt, PrintStmt, Stmt, VarStmt, WhileStmt};
 use crate::token::Token;
 use crate::token_type::TokenType;
 use Expr::Binary;
@@ -62,7 +62,7 @@ impl<'a> Parser<'a> {
     }
 
     // This is the entry point for the parser.
-    pub fn parse(&mut self) -> Result<Vec<Stmt>, LoxError> {
+    pub fn parse(&mut self) -> Result<Vec<Stmt>, LoxResult> {
         let mut statements = Vec::new();
         while !self.is_at_end() {
             statements.push(self.declaration()?)
@@ -71,11 +71,11 @@ impl<'a> Parser<'a> {
     }
 
     //It simply calls equality(), which is the highest precedence level in the expression grammar.
-    fn expression(&mut self) -> Result<Expr, LoxError> {
+    fn expression(&mut self) -> Result<Expr, LoxResult> {
         self.assignment()
     }
 
-    fn declaration(&mut self) -> Result<Stmt, LoxError> {
+    fn declaration(&mut self) -> Result<Stmt, LoxResult> {
         let result = if self.is_match(&[TokenType::Var]) {
             self.var_declaration()
         } else {
@@ -88,7 +88,12 @@ impl<'a> Parser<'a> {
         result
     }
 
-    fn statement(&mut self) -> Result<Stmt, LoxError> {
+    fn statement(&mut self) -> Result<Stmt, LoxResult> {
+        if self.is_match(&[TokenType::Break]) {
+            let token = self.peek().clone();
+            self.consume(TokenType::Semicolon, "Expect ';' after 'break'.")?;
+            return Ok(Stmt::Break(BreakStmt { token }));
+        }
         if self.is_match(&[TokenType::For]) {
             return self.for_statement();
         }
@@ -110,7 +115,7 @@ impl<'a> Parser<'a> {
         self.expression_statement()
     }
 
-    fn for_statement(&mut self) -> Result<Stmt, LoxError> {
+    fn for_statement(&mut self) -> Result<Stmt, LoxResult> {
         self.consume(TokenType::LeftParen, "Expect '(' after 'for'.")?;
 
         let initializer = if self.is_match(&[TokenType::Semicolon]) {
@@ -155,7 +160,7 @@ impl<'a> Parser<'a> {
         }
         Ok(body)
     }
-    fn if_statement(&mut self) -> Result<Stmt, LoxError> {
+    fn if_statement(&mut self) -> Result<Stmt, LoxResult> {
         self.consume(TokenType::LeftParen, "Expect '(' after 'if'.")?;
         let condition = self.expression()?;
         self.consume(TokenType::RightParen, "Expect '(' after 'if'.")?;
@@ -173,7 +178,7 @@ impl<'a> Parser<'a> {
         }))
     }
 
-    fn while_statement(&mut self) -> Result<Stmt, LoxError> {
+    fn while_statement(&mut self) -> Result<Stmt, LoxResult> {
         self.consume(TokenType::LeftParen, "Expect '(' after 'while'.")?;
         let condition = self.expression()?;
         self.consume(TokenType::RightParen, "Expect ')' after 'while'.")?;
@@ -184,7 +189,7 @@ impl<'a> Parser<'a> {
         }))
     }
 
-    fn assignment(&mut self) -> Result<Expr, LoxError> {
+    fn assignment(&mut self) -> Result<Expr, LoxResult> {
         let expr = self.or()?;
 
         if self.is_match(&[TokenType::Equal]) {
@@ -201,7 +206,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn or(&mut self) -> Result<Expr, LoxError> {
+    fn or(&mut self) -> Result<Expr, LoxResult> {
         let mut expr = self.and()?;
 
         while self.is_match(&[TokenType::Or]) {
@@ -215,7 +220,7 @@ impl<'a> Parser<'a> {
         }
         Ok(expr)
     }
-    fn and(&mut self) -> Result<Expr, LoxError> {
+    fn and(&mut self) -> Result<Expr, LoxResult> {
         let mut expr = self.equality()?;
 
         while self.is_match(&[TokenType::And]) {
@@ -230,7 +235,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn var_declaration(&mut self) -> Result<Stmt, LoxError> {
+    fn var_declaration(&mut self) -> Result<Stmt, LoxResult> {
         let name = self
             .consume(TokenType::Identifier, "Expect variable name.")?
             .clone();
@@ -247,19 +252,19 @@ impl<'a> Parser<'a> {
         Ok(Stmt::Var(VarStmt { name, initializer }))
     }
 
-    fn print_statement(&mut self) -> Result<Stmt, LoxError> {
+    fn print_statement(&mut self) -> Result<Stmt, LoxResult> {
         let expr = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
         Ok(Stmt::Print(PrintStmt { expression: expr }))
     }
 
-    fn expression_statement(&mut self) -> Result<Stmt, LoxError> {
+    fn expression_statement(&mut self) -> Result<Stmt, LoxResult> {
         let expr = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
         Ok(Stmt::Expression(ExpressionStmt { expression: expr }))
     }
 
-    fn block(&mut self) -> Result<Vec<Stmt>, LoxError> {
+    fn block(&mut self) -> Result<Vec<Stmt>, LoxResult> {
         let mut statements = Vec::new();
         while !self.check(TokenType::RightBrace) && !self.is_at_end() {
             statements.push(self.declaration()?)
@@ -270,7 +275,7 @@ impl<'a> Parser<'a> {
 
     // This method handles comparison operators (>, >=, <, <=). It works similarly to equality() but for comparison operators.
     //Example: a > b <= c would be parsed as ((a > b) <= c).
-    fn comparison(&mut self) -> Result<Expr, LoxError> {
+    fn comparison(&mut self) -> Result<Expr, LoxResult> {
         let mut expr = self.term()?;
 
         while self.is_match(&[
@@ -293,7 +298,7 @@ impl<'a> Parser<'a> {
 
     // These methods handle addition/subtraction and multiplication/division respectively. They work similarly to comparison() but for their specific operators.
     //Example for term(): a + b - c would be parsed as ((a + b) - c).
-    fn term(&mut self) -> Result<Expr, LoxError> {
+    fn term(&mut self) -> Result<Expr, LoxResult> {
         let mut expr = self.factor()?;
 
         while self.is_match(&[TokenType::Minus, TokenType::Plus]) {
@@ -309,7 +314,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
     // Example for factor(): a * b / c would be parsed as ((a * b) / c).
-    fn factor(&mut self) -> Result<Expr, LoxError> {
+    fn factor(&mut self) -> Result<Expr, LoxResult> {
         let mut expr = self.unary()?;
 
         while self.is_match(&[TokenType::Slash, TokenType::Star]) {
@@ -326,7 +331,7 @@ impl<'a> Parser<'a> {
     }
     // This method handles unary operators (! and -). If it finds a unary operator, it creates a unary expression. Otherwise, it falls through to primary().
     //Example: !-a would be parsed as (!(-a)).
-    fn unary(&mut self) -> Result<Expr, LoxError> {
+    fn unary(&mut self) -> Result<Expr, LoxResult> {
         if self.is_match(&[TokenType::Bang, TokenType::Minus]) {
             let operator = self.previous().clone();
             let right = self.unary()?;
@@ -340,7 +345,7 @@ impl<'a> Parser<'a> {
     //This method handles the most basic expressions: literals (numbers, strings, booleans, nil) and parenthesized expressions.
     //Example: For a number like 123, it would create a Literal expression.
     //For a parenthesized expression like (1 + 2), it would create a Grouping expression containing the inner expression.
-    fn primary(&mut self) -> Result<Expr, LoxError> {
+    fn primary(&mut self) -> Result<Expr, LoxResult> {
         if self.is_match(&[TokenType::False]) {
             return Ok(Expr::Literal(LiteralExpr {
                 value: Some(Object::Bool(false)),
@@ -377,10 +382,10 @@ impl<'a> Parser<'a> {
                 name: self.previous().clone(),
             }));
         }
-        Err(LoxError::pares_error(self.peek().clone(), "Expect expression."))
+        Err(LoxResult::pares_error(self.peek().clone(), "Expect expression."))
     }
     // consume checks if the current token matches the given token type
-    fn consume(&mut self, ttype: TokenType, message: &str) -> Result<&Token, LoxError> {
+    fn consume(&mut self, ttype: TokenType, message: &str) -> Result<&Token, LoxResult> {
         if self.check(ttype) {
             return Ok(self.advance());
         }
@@ -389,7 +394,7 @@ impl<'a> Parser<'a> {
     // This method handles equality comparisons (== and !=).
     //It first parses a comparison expression, then checks for equality operators. If found, it creates a binary expression.
     //Example: a == b != c would be parsed as ((a == b) != c).
-    fn equality(&mut self) -> Result<Expr, LoxError> {
+    fn equality(&mut self) -> Result<Expr, LoxResult> {
         let mut expr = self.comparison()?;
         while self.is_match(&[TokenType::BangEqual, TokenType::EqualEqual]) {
             let operator = self.previous().clone();
@@ -443,9 +448,9 @@ impl<'a> Parser<'a> {
         &self.tokens[self.current - 1]
     }
 
-    fn error(&mut self, token: Token, message: &str) -> LoxError {
+    fn error(&mut self, token: Token, message: &str) -> LoxResult {
         self.had_error = true;
-        LoxError::pares_error(token, message)
+        LoxResult::pares_error(token, message)
     }
     pub fn success(&self) -> bool {
         !self.had_error

@@ -12,7 +12,7 @@ mod interpreter;
 mod object;
 mod stmt;
 
-use crate::error::LoxError;
+use crate::error::{LoxResult};
 use crate::interpreter::Interpreter;
 use crate::parser::Parser;
 use scanner::Scanner;
@@ -73,7 +73,7 @@ impl Lox {
         }
     }
 
-    fn run(&self, source: String) -> Result<(), error::LoxError> {
+    fn run(&self, source: String) -> Result<(), error::LoxResult> {
         let mut scanner = Scanner::new(source);
         let tokens = scanner.scan_tokens()?;
         let mut parser = Parser::new(tokens);
@@ -81,7 +81,7 @@ impl Lox {
         if parser.success() && !self.interpreter.interpret(&stmts) {
             Ok(())
         } else {
-            Err(LoxError::new(0, "could not interpret"))
+            Err(LoxResult::GenericError { line: 0, message: "could not interpret".to_string() })
         }
     }
 }

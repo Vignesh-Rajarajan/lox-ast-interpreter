@@ -1,10 +1,10 @@
-use crate::error::LoxError;
 use crate::object::Object;
 use crate::token::Token;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::rc::Rc;
+use crate::error::LoxResult;
 
 pub struct Environment {
     values: HashMap<String, Object>,
@@ -30,27 +30,27 @@ impl Environment {
         self.values.insert(name, value);
     }
 
-    pub fn get(&self, name: &Token) -> Result<Object, LoxError> {
+    pub fn get(&self, name: &Token) -> Result<Object, LoxResult> {
         if let Some(value) = self.values.get(name.lexeme.as_str()) {
             Ok(value.clone())
         } else if let Some(enclosing) = &self.enclosing {
             enclosing.borrow().get(name)
         } else {
-            Err(LoxError::runtime_error(
+            Err(LoxResult::runtime_error(
                 name,
                 format!("Undefined variable '{}'.", name).as_str(),
             ))
         }
     }
 
-    pub fn assign(&mut self, name: &Token, value: Object) -> Result<(), LoxError> {
+    pub fn assign(&mut self, name: &Token, value: Object) -> Result<(), LoxResult> {
         if let Entry::Occupied(mut object) = self.values.entry(name.lexeme.clone()) {
             object.insert(value);
             Ok(())
         } else if let Some(enclosing) = &self.enclosing {
             enclosing.borrow_mut().assign(name, value)
         } else {
-            Err(LoxError::runtime_error(
+            Err(LoxResult::runtime_error(
                 name,
                 format!("Undefined variable '{}'.", name).as_str(),
             ))
