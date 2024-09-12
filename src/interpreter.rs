@@ -1,32 +1,32 @@
 use crate::environment::Environment;
 use crate::error::{LoxResult};
 use crate::expr::*;
-use crate::object::Object;
+use crate::object::{Object};
 use crate::stmt::{BlockStmt, BreakStmt, ExpressionStmt, IfStmt, PrintStmt, Stmt, StmtVisitor, VarStmt, WhileStmt};
 use crate::token_type::TokenType;
 use std::cell::RefCell;
 use std::rc::Rc;
+use crate::callable::{LoxCallable, Callable, NativeClock};
+use crate::callable::*;
 
 pub struct Interpreter {
     //An environment typically stores variables and their values during program execution
     environment: RefCell<Rc<RefCell<Environment>>>,
     nesting_level: RefCell<usize>,
+    globals: Rc<RefCell<Environment>>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
+        let globals = Rc::new(RefCell::new(Environment::new()));
+        globals.borrow_mut().define("clock".to_string(), Object::Func(Callable {
+            func: Rc::new(NativeClock {}),
+            arity: 0,
+        }));
         Self {
-            // 1. The outermost RefCell allows for interior mutability,
-            //    meaning we can change the contents of this structure even if we only have a shared reference to it.
-            //    This is useful in situations where we need to modify the environment from different parts of the program.
-            // 2. Inner Rc allows multiple parts of the program to share ownership of the same environment.
-            //    When all references to this Rc are dropped, the memory it holds is automatically freed
-            // The outer doll (RefCell) can be opened by anyone holding it.
-            // Inside is a deed (Rc) that can be photocopied and shared.
-            // The deed protects another openable doll (inner RefCell).
-            // At the very center is your precious environment.
-            environment: RefCell::new(Rc::new(RefCell::new(Environment::new()))),
+            environment: RefCell::new(Rc::clone(&globals)),
             nesting_level: RefCell::new(0),
+            globals: Rc::clone(&globals),
         }
     }
     pub fn evaluate(&self, expr: &Expr) -> Result<Object, LoxResult> {
@@ -236,6 +236,24 @@ impl ExprVisitor<Object> for Interpreter {
             _ => Err(LoxResult::runtime_error(&expr.operator, "invalid operator")),
         }
     }
+
+    fn visit_call_expr(&self, expr: &CallExpr) -> Result<Object, LoxResult> {
+        let callee = self.evaluate(&expr.callee)?;
+        let mut arguments = Vec::new();
+        for arg in &expr.arguments {
+            arguments.push(self.evaluate(arg)?);
+        }
+        if let Object::Func(function) = callee {
+            if arguments.len() != function.arity() {
+                return Err(LoxResult::runtime_error(&expr.paren,
+                                                    &format!("expected {} arguments but got {}", function.arity(), arguments.len())));
+            }
+            function.func.call(self, arguments)
+        } else {
+            Err(LoxResult::runtime_error(&expr.paren, "can only call functions and classes"))
+        }
+    }
+
     fn visit_grouping_expr(&self, expr: &GroupingExpr) -> Result<Object, LoxResult> {
         self.evaluate(&expr.expression)
     }

@@ -1,4 +1,8 @@
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
+use std::rc::Rc;
+use crate::callable::Callable;
+use crate::error::LoxResult;
+use crate::interpreter::Interpreter;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Object {
@@ -6,6 +10,7 @@ pub enum Object {
     Number(f64),
     Nil,
     Bool(bool),
+    Func(Callable),
 }
 
 impl Object {
@@ -15,6 +20,7 @@ impl Object {
             Object::Number(_) => "number".to_string(),
             Object::Nil => "nil".to_string(),
             Object::Bool(_) => "bool".to_string(),
+            Object::Func(_) => "function".to_string(),
         }
     }
 }
@@ -25,6 +31,7 @@ impl Display for Object {
             Object::Number(n) => write!(f, "{}", n),
             Object::Nil => write!(f, "nil"),
             Object::Bool(b) => write!(f, "{}", b),
+            Object::Func(_) => write!(f, "function"),
         }
     }
 }

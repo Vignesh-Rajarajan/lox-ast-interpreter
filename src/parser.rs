@@ -1,8 +1,6 @@
 use crate::error::{LoxResult};
 use crate::expr::Expr::{Literal, Unary};
-use crate::expr::{
-    AssignExpr, BinaryExpr, Expr, GroupingExpr, LiteralExpr, LogicalExpr, UnaryExpr, VariableExpr,
-};
+use crate::expr::{AssignExpr, BinaryExpr, CallExpr, Expr, GroupingExpr, LiteralExpr, LogicalExpr, UnaryExpr, VariableExpr};
 use crate::object::Object;
 use crate::stmt::{BlockStmt, BreakStmt, ExpressionStmt, IfStmt, PrintStmt, Stmt, VarStmt, WhileStmt};
 use crate::token::Token;
@@ -340,11 +338,36 @@ impl<'a> Parser<'a> {
                 right: Box::new(right),
             }));
         }
-        self.primary()
+        self.call()
     }
-    //This method handles the most basic expressions: literals (numbers, strings, booleans, nil) and parenthesized expressions.
-    //Example: For a number like 123, it would create a Literal expression.
-    //For a parenthesized expression like (1 + 2), it would create a Grouping expression containing the inner expression.
+
+    fn call(&mut self) -> Result<Expr, LoxResult> {
+        let mut expr = self.primary()?;
+        loop {
+            if self.is_match(&[TokenType::LeftParen]) {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Expr) -> Result<Expr, LoxResult> {
+        let mut arguments = Vec::new();
+        if !self.check(TokenType::RightParen) {
+            arguments.push(self.expression()?);
+            while self.is_match(&[TokenType::Comma]) {
+                arguments.push(self.expression()?);
+            }
+        }
+        let paren = self.consume(TokenType::RightParen, "Expect ')' after arguments.")?;
+        Ok(Expr::Call(CallExpr {
+            callee: Box::new(callee),
+            paren: paren.clone(),
+            arguments,
+        }))
+    }
     fn primary(&mut self) -> Result<Expr, LoxResult> {
         if self.is_match(&[TokenType::False]) {
             return Ok(Expr::Literal(LiteralExpr {
