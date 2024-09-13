@@ -2,18 +2,18 @@ use crate::environment::Environment;
 use crate::error::{LoxResult};
 use crate::expr::*;
 use crate::object::{Object};
-use crate::stmt::{BlockStmt, BreakStmt, ExpressionStmt, IfStmt, PrintStmt, Stmt, StmtVisitor, VarStmt, WhileStmt};
+use crate::stmt::{BlockStmt, BreakStmt, ExpressionStmt, FunctionStmt, IfStmt, PrintStmt, ReturnStmt, Stmt, StmtVisitor, VarStmt, WhileStmt};
 use crate::token_type::TokenType;
 use std::cell::RefCell;
 use std::rc::Rc;
 use crate::callable::{LoxCallable, Callable, NativeClock};
-use crate::callable::*;
+use crate::function::LoxFunction;
 
 pub struct Interpreter {
     //An environment typically stores variables and their values during program execution
     environment: RefCell<Rc<RefCell<Environment>>>,
     nesting_level: RefCell<usize>,
-    globals: Rc<RefCell<Environment>>,
+    pub globals: Rc<RefCell<Environment>>,
 }
 
 impl Interpreter {
@@ -21,7 +21,6 @@ impl Interpreter {
         let globals = Rc::new(RefCell::new(Environment::new()));
         globals.borrow_mut().define("clock".to_string(), Object::Func(Callable {
             func: Rc::new(NativeClock {}),
-            arity: 0,
         }));
         Self {
             environment: RefCell::new(Rc::clone(&globals)),
@@ -50,7 +49,7 @@ impl Interpreter {
         stmt.accept(self)
     }
 
-    fn execute_block(&self, stmts: &[Stmt], environment: Environment) -> Result<(), LoxResult> {
+    pub fn execute_block(&self, stmts: &[Stmt], environment: Environment) -> Result<(), LoxResult> {
         let previous = self.environment.replace(Rc::new(RefCell::new(environment)));
         let mut result = Ok(());
         for stmt in stmts {
@@ -84,6 +83,17 @@ impl StmtVisitor<()> for Interpreter {
         Ok(())
     }
 
+    fn visit_function_stmt(&self, stmt: &FunctionStmt) -> Result<(), LoxResult> {
+        let func = LoxFunction::new(stmt);
+        self.environment
+            .borrow()
+            .borrow_mut()
+            .define(stmt.name.lexeme.to_string(), Object::Func(Callable {
+                func: Rc::new(func),
+            }));
+        Ok(())
+    }
+
     fn visit_break_stmt(&self, stmt: &BreakStmt) -> Result<(), LoxResult> {
         if *self.nesting_level.borrow() == 0 {
             return Err(LoxResult::runtime_error(&stmt.token.clone(), "Can't break outside of loop"));
@@ -95,6 +105,14 @@ impl StmtVisitor<()> for Interpreter {
         let value = self.evaluate(&stmt.expression)?;
         println!("{:?}", value.to_string());
         Ok(())
+    }
+
+    fn visit_return_stmt(&self, stmt: &ReturnStmt) -> Result<(), LoxResult> {
+        if let Some(value) = &stmt.value {
+            Err(LoxResult::return_value(self.evaluate(value)?))
+        } else {
+            Err(LoxResult::return_value(Object::Nil))
+        }
     }
 
     fn visit_var_stmt(&self, stmt: &VarStmt) -> Result<(), LoxResult> {

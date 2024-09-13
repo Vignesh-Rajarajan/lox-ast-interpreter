@@ -1,0 +1,20 @@
+fun sayHi(first, last) {
+    print "Hi " + first + " " + last + "!";
+}
+sayHi("John", "Doe");
+var global= 3;
+fun foo(local){
+ print local*global;
+}
+foo(2);
+
+fun fib(n) {
+    if (n < 2) {
+        return n;
+    }
+    return fib(n - 1) + fib(n - 2);
+}
+
+for (var i = 0; i < 20; i=i+1) {
+    print fib(i);
+}

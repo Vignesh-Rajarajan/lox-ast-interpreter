@@ -1,8 +1,5 @@
 use std::fmt::{Debug, Display};
-use std::rc::Rc;
 use crate::callable::Callable;
-use crate::error::LoxResult;
-use crate::interpreter::Interpreter;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Object {

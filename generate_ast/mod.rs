@@ -28,13 +28,15 @@ pub fn generate_ast(output_dir: &str) -> io::Result<()> {
     define_ast(
         output_dir,
         "Stmt",
-        vec!["error", "expr", "token"],
+        vec!["error", "expr", "token", "rc"],
         vec![
             "Block : Vec<Stmt> statements".to_string(),
             "If : Expr condition, Box<Stmt> then_branch, Option<Box<Stmt>> else_branch".to_string(),
             "Expression : Expr expression".to_string(),
+            "Function : Token name, Rc<Vec<Token>> params, Rc<Vec<Stmt>> body".to_string(),
             "Break: Token token".to_string(),
             "Print : Expr expression".to_string(),
+            "Return : Token token, Option<Expr> value".to_string(),
             "Var : Token name, Option<Expr> initializer".to_string(),
             "While : Expr condition, Box<Stmt> body".to_string(),
         ],
@@ -53,7 +55,11 @@ fn define_ast(
     let mut file = std::fs::File::create(path)?;
     let mut tree_types = Vec::new();
     for import in imports {
-        writeln!(file, "use crate::{}::*;", import)?;
+        if import == "rc" {
+            writeln!(file, "use std::rc::Rc;")?;
+        } else {
+            writeln!(file, "use crate::{}::*;", import)?;
+        }
     }
     // writeln!(file, "use crate::token::*;")?;
     // writeln!(file, "use crate::error::*;")?;
