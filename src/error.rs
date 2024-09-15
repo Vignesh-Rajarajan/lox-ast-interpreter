@@ -2,7 +2,6 @@ use crate::object::Object;
 use crate::token::Token;
 use crate::token_type::TokenType;
 
-
 #[derive(Debug)]
 pub enum LoxResult {
     ParseError { token: Token, message: String },
@@ -53,7 +52,8 @@ impl LoxResult {
     }
     pub fn report(&self, loc: &str) {
         match self {
-            LoxResult::ParseError { token, message } | LoxResult::RuntimeError { token, message } => {
+            LoxResult::ParseError { token, message }
+            | LoxResult::RuntimeError { token, message } => {
                 if token.ttype == TokenType::Eof {
                     eprintln!("[line {}] Error at end: {}", token.line, message);
                 } else {

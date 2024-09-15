@@ -1,10 +1,10 @@
+use crate::error::LoxResult;
 use crate::object::Object;
 use crate::token::Token;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::rc::Rc;
-use crate::error::LoxResult;
 
 pub struct Environment {
     values: HashMap<String, Object>,

@@ -1,8 +1,8 @@
-use std::fmt::{Debug, Display};
-use std::rc::Rc;
 use crate::error::LoxResult;
 use crate::interpreter::Interpreter;
 use crate::object::Object;
+use std::fmt::{Debug, Display};
+use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct Callable {
@@ -42,7 +42,6 @@ impl LoxCallable for Callable {
         self.func.to_string()
     }
 }
-
 
 pub struct NativeClock;
 impl LoxCallable for NativeClock {

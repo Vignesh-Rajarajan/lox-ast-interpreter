@@ -1,5 +1,5 @@
-use std::fmt::{Debug, Display};
 use crate::callable::Callable;
+use std::fmt::{Debug, Display};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Object {

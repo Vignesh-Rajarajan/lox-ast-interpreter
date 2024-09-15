@@ -1,13 +1,17 @@
+use crate::callable::{Callable, LoxCallable, NativeClock};
 use crate::environment::Environment;
-use crate::error::{LoxResult};
+use crate::error::LoxResult;
 use crate::expr::*;
-use crate::object::{Object};
-use crate::stmt::{BlockStmt, BreakStmt, ExpressionStmt, FunctionStmt, IfStmt, PrintStmt, ReturnStmt, Stmt, StmtVisitor, VarStmt, WhileStmt};
+use crate::function::LoxFunction;
+use crate::object::Object;
+use crate::stmt::{
+    BlockStmt, BreakStmt, ExpressionStmt, FunctionStmt, IfStmt, PrintStmt, ReturnStmt, Stmt,
+    StmtVisitor, VarStmt, WhileStmt,
+};
 use crate::token_type::TokenType;
 use std::cell::RefCell;
+use std::ops::Deref;
 use std::rc::Rc;
-use crate::callable::{LoxCallable, Callable, NativeClock};
-use crate::function::LoxFunction;
 
 pub struct Interpreter {
     //An environment typically stores variables and their values during program execution
@@ -19,9 +23,12 @@ pub struct Interpreter {
 impl Interpreter {
     pub fn new() -> Self {
         let globals = Rc::new(RefCell::new(Environment::new()));
-        globals.borrow_mut().define("clock".to_string(), Object::Func(Callable {
-            func: Rc::new(NativeClock {}),
-        }));
+        globals.borrow_mut().define(
+            "clock".to_string(),
+            Object::Func(Callable {
+                func: Rc::new(NativeClock {}),
+            }),
+        );
         Self {
             environment: RefCell::new(Rc::clone(&globals)),
             nesting_level: RefCell::new(0),
@@ -84,19 +91,22 @@ impl StmtVisitor<()> for Interpreter {
     }
 
     fn visit_function_stmt(&self, stmt: &FunctionStmt) -> Result<(), LoxResult> {
-        let func = LoxFunction::new(stmt);
-        self.environment
-            .borrow()
-            .borrow_mut()
-            .define(stmt.name.lexeme.to_string(), Object::Func(Callable {
+        let func = LoxFunction::new(stmt, self.environment.borrow().deref());
+        self.environment.borrow().borrow_mut().define(
+            stmt.name.lexeme.to_string(),
+            Object::Func(Callable {
                 func: Rc::new(func),
-            }));
+            }),
+        );
         Ok(())
     }
 
     fn visit_break_stmt(&self, stmt: &BreakStmt) -> Result<(), LoxResult> {
         if *self.nesting_level.borrow() == 0 {
-            return Err(LoxResult::runtime_error(&stmt.token.clone(), "Can't break outside of loop"));
+            return Err(LoxResult::runtime_error(
+                &stmt.token.clone(),
+                "Can't break outside of loop",
+            ));
         }
         Err(LoxResult::Break)
     }
@@ -263,12 +273,21 @@ impl ExprVisitor<Object> for Interpreter {
         }
         if let Object::Func(function) = callee {
             if arguments.len() != function.arity() {
-                return Err(LoxResult::runtime_error(&expr.paren,
-                                                    &format!("expected {} arguments but got {}", function.arity(), arguments.len())));
+                return Err(LoxResult::runtime_error(
+                    &expr.paren,
+                    &format!(
+                        "expected {} arguments but got {}",
+                        function.arity(),
+                        arguments.len()
+                    ),
+                ));
             }
             function.func.call(self, arguments)
         } else {
-            Err(LoxResult::runtime_error(&expr.paren, "can only call functions and classes"))
+            Err(LoxResult::runtime_error(
+                &expr.paren,
+                "can only call functions and classes",
+            ))
         }
     }
 

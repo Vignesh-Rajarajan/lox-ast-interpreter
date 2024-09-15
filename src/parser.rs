@@ -1,11 +1,17 @@
-use std::rc::Rc;
-use crate::error::{LoxResult};
+use crate::error::LoxResult;
 use crate::expr::Expr::{Literal, Unary};
-use crate::expr::{AssignExpr, BinaryExpr, CallExpr, Expr, GroupingExpr, LiteralExpr, LogicalExpr, UnaryExpr, VariableExpr};
+use crate::expr::{
+    AssignExpr, BinaryExpr, CallExpr, Expr, GroupingExpr, LiteralExpr, LogicalExpr, UnaryExpr,
+    VariableExpr,
+};
 use crate::object::Object;
-use crate::stmt::{BlockStmt, BreakStmt, ExpressionStmt, FunctionStmt, IfStmt, PrintStmt, ReturnStmt, Stmt, VarStmt, WhileStmt};
+use crate::stmt::{
+    BlockStmt, BreakStmt, ExpressionStmt, FunctionStmt, IfStmt, PrintStmt, ReturnStmt, Stmt,
+    VarStmt, WhileStmt,
+};
 use crate::token::Token;
 use crate::token_type::TokenType;
+use std::rc::Rc;
 use Expr::Binary;
 
 pub struct Parser<'a> {
@@ -124,9 +130,14 @@ impl<'a> Parser<'a> {
         let keyword = self.previous().clone();
         let value = if !self.check(TokenType::Semicolon) {
             Some(self.expression()?)
-        } else { None };
+        } else {
+            None
+        };
         self.consume(TokenType::Semicolon, "Expect ';' after return value.")?;
-        Ok(Stmt::Return(ReturnStmt { token: keyword, value }))
+        Ok(Stmt::Return(ReturnStmt {
+            token: keyword,
+            value,
+        }))
     }
 
     fn for_statement(&mut self) -> Result<Stmt, LoxResult> {
@@ -148,28 +159,37 @@ impl<'a> Parser<'a> {
 
         let increment = if !self.check(TokenType::RightParen) {
             Some(self.expression()?)
-        } else { None };
+        } else {
+            None
+        };
 
         self.consume(TokenType::RightParen, "Expect ')' after for clauses.")?;
         let mut body = self.statement()?;
 
         if let Some(increment) = increment {
             body = Stmt::Block(BlockStmt {
-                statements: vec![body, Stmt::Expression(ExpressionStmt { expression: increment })]
+                statements: vec![
+                    body,
+                    Stmt::Expression(ExpressionStmt {
+                        expression: increment,
+                    }),
+                ],
             });
         }
         body = Stmt::While(WhileStmt {
             condition: if let Some(condition) = condition {
                 condition
             } else {
-                Literal(LiteralExpr { value: Some(Object::Bool(true)) })
+                Literal(LiteralExpr {
+                    value: Some(Object::Bool(true)),
+                })
             },
             body: Box::new(body),
         });
 
         if let Some(initializer) = initializer {
             body = Stmt::Block(BlockStmt {
-                statements: vec![initializer, body]
+                statements: vec![initializer, body],
             });
         }
         Ok(body)
@@ -279,23 +299,41 @@ impl<'a> Parser<'a> {
     }
 
     fn function(&mut self, kind: &str) -> Result<Stmt, LoxResult> {
-        let fn_name = self.consume(TokenType::Identifier, &format!("Expect {} name.", kind))?.clone();
-        self.consume(TokenType::LeftParen, &format!("Expect '(' after {} name.", kind))?;
+        let fn_name = self
+            .consume(TokenType::Identifier, &format!("Expect {} name.", kind))?
+            .clone();
+        self.consume(
+            TokenType::LeftParen,
+            &format!("Expect '(' after {} name.", kind),
+        )?;
         let mut parameters = Vec::new();
         if !self.check(TokenType::RightParen) {
-            parameters.push(self.consume(TokenType::Identifier, "Expect parameter name.")?.clone());
+            parameters.push(
+                self.consume(TokenType::Identifier, "Expect parameter name.")?
+                    .clone(),
+            );
             while self.is_match(&[TokenType::Comma]) {
                 if parameters.len() >= 255 && !self.had_error {
                     let peek = self.peek().clone();
                     return Err(self.error(peek, "Can't have more than 255 parameters."));
                 }
-                parameters.push(self.consume(TokenType::Identifier, "Expect parameter name.")?.clone());
+                parameters.push(
+                    self.consume(TokenType::Identifier, "Expect parameter name.")?
+                        .clone(),
+                );
             }
         }
         self.consume(TokenType::RightParen, "Expect ')' after parameters.")?;
-        self.consume(TokenType::LeftBrace, &format!("Expect '{{' before {} body.", kind))?;
+        self.consume(
+            TokenType::LeftBrace,
+            &format!("Expect '{{' before {} body.", kind),
+        )?;
         let body = self.block()?;
-        Ok(Stmt::Function(FunctionStmt { name: fn_name, params: Rc::new(parameters), body: Rc::new(body) }))
+        Ok(Stmt::Function(FunctionStmt {
+            name: fn_name,
+            params: Rc::new(parameters),
+            body: Rc::new(body),
+        }))
     }
 
     fn block(&mut self) -> Result<Vec<Stmt>, LoxResult> {
@@ -441,7 +479,10 @@ impl<'a> Parser<'a> {
                 name: self.previous().clone(),
             }));
         }
-        Err(LoxResult::pares_error(self.peek().clone(), "Expect expression."))
+        Err(LoxResult::pares_error(
+            self.peek().clone(),
+            "Expect expression.",
+        ))
     }
     // consume checks if the current token matches the given token type
     fn consume(&mut self, ttype: TokenType, message: &str) -> Result<&Token, LoxResult> {

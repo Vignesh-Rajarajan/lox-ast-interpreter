@@ -1,4 +1,3 @@
-
 // pub(crate) struct AstPrinter;
 //
 // impl AstPrinter {

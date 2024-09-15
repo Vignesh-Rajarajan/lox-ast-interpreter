@@ -1,4 +1,4 @@
-use crate::error::{LoxResult};
+use crate::error::LoxResult;
 use crate::object::Object;
 use crate::token::Token;
 use crate::token_type::TokenType;

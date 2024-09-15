@@ -7,14 +7,14 @@ mod token;
 mod token_type;
 
 mod ast_printer;
+mod callable;
 mod environment;
+mod function;
 mod interpreter;
 mod object;
 mod stmt;
-mod callable;
-mod function;
 
-use crate::error::{LoxResult};
+use crate::error::LoxResult;
 use crate::interpreter::Interpreter;
 use crate::parser::Parser;
 use scanner::Scanner;
@@ -83,7 +83,10 @@ impl Lox {
         if parser.success() && !self.interpreter.interpret(&stmts) {
             Ok(())
         } else {
-            Err(LoxResult::GenericError { line: 0, message: "could not interpret".to_string() })
+            Err(LoxResult::GenericError {
+                line: 0,
+                message: "could not interpret".to_string(),
+            })
         }
     }
 }
