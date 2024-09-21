@@ -67,7 +67,7 @@ impl<'a> Parser<'a> {
     }
 
     // This is the entry point for the parser.
-    pub fn parse(&mut self) -> Result<Vec<Stmt>, LoxResult> {
+    pub fn parse(&mut self) -> Result<Vec<Rc<Stmt>>, LoxResult> {
         let mut statements = Vec::new();
         while !self.is_at_end() {
             statements.push(self.declaration()?)
@@ -80,7 +80,7 @@ impl<'a> Parser<'a> {
         self.assignment()
     }
 
-    fn declaration(&mut self) -> Result<Stmt, LoxResult> {
+    fn declaration(&mut self) -> Result<Rc<Stmt>, LoxResult> {
         let result = if self.is_match(&[TokenType::Fun]) {
             self.function("function")
         } else if self.is_match(&[TokenType::Var]) {
@@ -95,33 +95,34 @@ impl<'a> Parser<'a> {
         result
     }
 
-    fn statement(&mut self) -> Result<Stmt, LoxResult> {
+    fn statement(&mut self) -> Result<Rc<Stmt>, LoxResult> {
         if self.is_match(&[TokenType::Break]) {
             let token = self.peek().clone();
             self.consume(TokenType::Semicolon, "Expect ';' after 'break'.")?;
-            return Ok(Stmt::Break(BreakStmt { token }));
+            return Ok(Rc::new(Stmt::Break(Rc::new(BreakStmt { token }))));
         }
         if self.is_match(&[TokenType::For]) {
             return self.for_statement();
         }
 
         if self.is_match(&[TokenType::If]) {
-            return self.if_statement();
+            return Ok(Rc::new(self.if_statement()?));
         }
         if self.is_match(&[TokenType::Print]) {
-            return self.print_statement();
+            return Ok(Rc::new(self.print_statement()?));
         }
 
         if self.is_match(&[TokenType::Return]) {
-            return self.return_statement();
+            return Ok(Rc::new(self.return_statement()?));
         }
 
         if self.is_match(&[TokenType::While]) {
-            return self.while_statement();
+            return Ok(self.while_statement()?);
         }
         if self.is_match(&[TokenType::LeftBrace]) {
-            let statements = self.block()?;
-            return Ok(Stmt::Block(BlockStmt { statements }));
+            return Ok(Rc::new(Stmt::Block(Rc::new(BlockStmt {
+                statements: Rc::new(self.block()?),
+            }))));
         }
         self.expression_statement()
     }
@@ -129,18 +130,18 @@ impl<'a> Parser<'a> {
     fn return_statement(&mut self) -> Result<Stmt, LoxResult> {
         let keyword = self.previous().clone();
         let value = if !self.check(TokenType::Semicolon) {
-            Some(self.expression()?)
+            Some(Rc::new(self.expression()?))
         } else {
             None
         };
         self.consume(TokenType::Semicolon, "Expect ';' after return value.")?;
-        Ok(Stmt::Return(ReturnStmt {
+        Ok(Stmt::Return(Rc::new(ReturnStmt {
             token: keyword,
             value,
-        }))
+        })))
     }
 
-    fn for_statement(&mut self) -> Result<Stmt, LoxResult> {
+    fn for_statement(&mut self) -> Result<Rc<Stmt>, LoxResult> {
         self.consume(TokenType::LeftParen, "Expect '(' after 'for'.")?;
 
         let initializer = if self.is_match(&[TokenType::Semicolon]) {
@@ -167,60 +168,60 @@ impl<'a> Parser<'a> {
         let mut body = self.statement()?;
 
         if let Some(increment) = increment {
-            body = Stmt::Block(BlockStmt {
-                statements: vec![
+            body = Rc::new(Stmt::Block(Rc::new(BlockStmt {
+                statements: Rc::new(vec![
                     body,
-                    Stmt::Expression(ExpressionStmt {
-                        expression: increment,
-                    }),
-                ],
-            });
+                    Rc::new(Stmt::Expression(Rc::new(ExpressionStmt {
+                        expression: Rc::new(increment),
+                    }))),
+                ]),
+            })));
         }
-        body = Stmt::While(WhileStmt {
+        body = Rc::new(Stmt::While(Rc::new(WhileStmt {
             condition: if let Some(condition) = condition {
-                condition
+                Rc::new(condition)
             } else {
-                Literal(LiteralExpr {
+                Rc::new(Expr::Literal(Rc::new(LiteralExpr {
                     value: Some(Object::Bool(true)),
-                })
+                })))
             },
-            body: Box::new(body),
-        });
+            body,
+        })));
 
         if let Some(initializer) = initializer {
-            body = Stmt::Block(BlockStmt {
-                statements: vec![initializer, body],
-            });
+            body = Rc::new(Stmt::Block(Rc::new(BlockStmt {
+                statements: Rc::new(vec![initializer, body]),
+            })));
         }
         Ok(body)
     }
     fn if_statement(&mut self) -> Result<Stmt, LoxResult> {
         self.consume(TokenType::LeftParen, "Expect '(' after 'if'.")?;
-        let condition = self.expression()?;
+        let condition = Rc::new(self.expression()?);
         self.consume(TokenType::RightParen, "Expect '(' after 'if'.")?;
 
         let then_branch = self.statement()?;
         let else_branch = if self.is_match(&[TokenType::Else]) {
-            Some(Box::new(self.statement()?))
+            Some(self.statement()?)
         } else {
             None
         };
-        Ok(Stmt::If(IfStmt {
+        Ok(Stmt::If(Rc::new(IfStmt {
             condition,
-            then_branch: Box::new(then_branch),
+            then_branch,
             else_branch,
-        }))
+        })))
     }
 
-    fn while_statement(&mut self) -> Result<Stmt, LoxResult> {
+    fn while_statement(&mut self) -> Result<Rc<Stmt>, LoxResult> {
         self.consume(TokenType::LeftParen, "Expect '(' after 'while'.")?;
-        let condition = self.expression()?;
+        let condition = Rc::new(self.expression()?);
         self.consume(TokenType::RightParen, "Expect ')' after 'while'.")?;
         let body = self.statement()?;
-        Ok(Stmt::While(WhileStmt {
+        Ok(Rc::new(Stmt::While(Rc::new(WhileStmt {
             condition,
-            body: Box::new(body),
-        }))
+            body,
+        }))))
     }
 
     fn assignment(&mut self) -> Result<Expr, LoxResult> {
@@ -228,12 +229,12 @@ impl<'a> Parser<'a> {
 
         if self.is_match(&[TokenType::Equal]) {
             let equals = self.previous().clone();
-            let value = self.assignment()?;
+            let value = Rc::new(self.assignment()?);
             if let Expr::Variable(var) = expr {
-                return Ok(Expr::Assign(AssignExpr {
-                    name: var.name,
-                    value: Box::new(value),
-                }));
+                return Ok(Expr::Assign(Rc::new(AssignExpr {
+                    name: var.name.clone(),
+                    value,
+                })));
             }
             return Err(self.error(equals, "Invalid assignment target."));
         }
@@ -245,12 +246,12 @@ impl<'a> Parser<'a> {
 
         while self.is_match(&[TokenType::Or]) {
             let operator = self.previous().clone();
-            let right = self.and()?;
-            expr = Expr::Logical(LogicalExpr {
-                left: Box::new(expr),
+            let right = Rc::new(self.and()?);
+            expr = Expr::Logical(Rc::new(LogicalExpr {
+                left: Rc::new(expr),
                 operator,
-                right: Box::new(right),
-            });
+                right,
+            }));
         }
         Ok(expr)
     }
@@ -260,21 +261,21 @@ impl<'a> Parser<'a> {
         while self.is_match(&[TokenType::And]) {
             let operator = self.previous().clone();
             let right = self.equality()?;
-            expr = Expr::Logical(LogicalExpr {
-                left: Box::new(expr),
+            expr = Expr::Logical(Rc::new(LogicalExpr {
+                left: Rc::new(expr),
                 operator,
-                right: Box::new(right),
-            });
+                right: Rc::new(right),
+            }));
         }
         Ok(expr)
     }
 
-    fn var_declaration(&mut self) -> Result<Stmt, LoxResult> {
+    fn var_declaration(&mut self) -> Result<Rc<Stmt>, LoxResult> {
         let name = self
             .consume(TokenType::Identifier, "Expect variable name.")?
             .clone();
         let initializer = if self.is_match(&[TokenType::Equal]) {
-            Some(self.expression()?)
+            Some(Rc::new(self.expression()?))
         } else {
             None
         };
@@ -283,22 +284,22 @@ impl<'a> Parser<'a> {
             TokenType::Semicolon,
             "Expect ';' after variable declaration.",
         )?;
-        Ok(Stmt::Var(VarStmt { name, initializer }))
+        Ok(Rc::new(Stmt::Var(Rc::new(VarStmt { name, initializer }))))
     }
 
     fn print_statement(&mut self) -> Result<Stmt, LoxResult> {
-        let expr = self.expression()?;
+        let expr = Rc::new(self.expression()?);
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
-        Ok(Stmt::Print(PrintStmt { expression: expr }))
+        Ok(Stmt::Print(Rc::new(PrintStmt { expression: expr })))
     }
 
-    fn expression_statement(&mut self) -> Result<Stmt, LoxResult> {
-        let expr = self.expression()?;
+    fn expression_statement(&mut self) -> Result<Rc<Stmt>, LoxResult> {
+        let expr = Rc::new(self.expression()?);
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
-        Ok(Stmt::Expression(ExpressionStmt { expression: expr }))
+        Ok(Rc::new(Stmt::Expression(Rc::new(ExpressionStmt { expression: expr }))))
     }
 
-    fn function(&mut self, kind: &str) -> Result<Stmt, LoxResult> {
+    fn function(&mut self, kind: &str) -> Result<Rc<Stmt>, LoxResult> {
         let fn_name = self
             .consume(TokenType::Identifier, &format!("Expect {} name.", kind))?
             .clone();
@@ -329,14 +330,14 @@ impl<'a> Parser<'a> {
             &format!("Expect '{{' before {} body.", kind),
         )?;
         let body = self.block()?;
-        Ok(Stmt::Function(FunctionStmt {
+        Ok(Rc::new(Stmt::Function(Rc::new(FunctionStmt {
             name: fn_name,
             params: Rc::new(parameters),
             body: Rc::new(body),
-        }))
+        }))))
     }
 
-    fn block(&mut self) -> Result<Vec<Stmt>, LoxResult> {
+    fn block(&mut self) -> Result<Vec<Rc<Stmt>>, LoxResult> {
         let mut statements = Vec::new();
         while !self.check(TokenType::RightBrace) && !self.is_at_end() {
             statements.push(self.declaration()?)
@@ -358,11 +359,11 @@ impl<'a> Parser<'a> {
         ]) {
             let operator = self.previous().clone();
             let right = self.term()?;
-            expr = Binary(BinaryExpr {
-                left: Box::new(expr),
+            expr = Binary(Rc::new(BinaryExpr {
+                left: Rc::new(expr),
                 operator,
-                right: Box::new(right),
-            })
+                right: Rc::new(right),
+            }))
         }
 
         Ok(expr)
@@ -376,11 +377,11 @@ impl<'a> Parser<'a> {
         while self.is_match(&[TokenType::Minus, TokenType::Plus]) {
             let operator = self.previous().clone();
             let right = self.factor()?;
-            expr = Binary(BinaryExpr {
-                left: Box::new(expr),
+            expr = Binary(Rc::new(BinaryExpr {
+                left: Rc::new(expr),
                 operator,
-                right: Box::new(right),
-            })
+                right: Rc::new(right),
+            }))
         }
 
         Ok(expr)
@@ -392,11 +393,11 @@ impl<'a> Parser<'a> {
         while self.is_match(&[TokenType::Slash, TokenType::Star]) {
             let operator = self.previous().clone();
             let right = self.unary()?;
-            expr = Binary(BinaryExpr {
-                left: Box::new(expr),
+            expr = Binary(Rc::new(BinaryExpr {
+                left: Rc::new(expr),
                 operator,
-                right: Box::new(right),
-            })
+                right: Rc::new(right),
+            }))
         }
 
         Ok(expr)
@@ -407,10 +408,10 @@ impl<'a> Parser<'a> {
         if self.is_match(&[TokenType::Bang, TokenType::Minus]) {
             let operator = self.previous().clone();
             let right = self.unary()?;
-            return Ok(Unary(UnaryExpr {
+            return Ok(Unary(Rc::new(UnaryExpr {
                 operator,
-                right: Box::new(right),
-            }));
+                right: Rc::new(right),
+            })));
         }
         self.call()
     }
@@ -430,54 +431,54 @@ impl<'a> Parser<'a> {
     fn finish_call(&mut self, callee: Expr) -> Result<Expr, LoxResult> {
         let mut arguments = Vec::new();
         if !self.check(TokenType::RightParen) {
-            arguments.push(self.expression()?);
+            arguments.push(Rc::new(self.expression()?));
             while self.is_match(&[TokenType::Comma]) {
-                arguments.push(self.expression()?);
+                arguments.push(Rc::new(self.expression()?));
             }
         }
         let paren = self.consume(TokenType::RightParen, "Expect ')' after arguments.")?;
-        Ok(Expr::Call(CallExpr {
-            callee: Box::new(callee),
+        Ok(Expr::Call(Rc::new(CallExpr {
+            callee: Rc::new(callee),
             paren: paren.clone(),
             arguments,
-        }))
+        })))
     }
     fn primary(&mut self) -> Result<Expr, LoxResult> {
         if self.is_match(&[TokenType::False]) {
-            return Ok(Expr::Literal(LiteralExpr {
+            return Ok(Literal(Rc::new(LiteralExpr {
                 value: Some(Object::Bool(false)),
-            }));
+            })));
         }
 
         if self.is_match(&[TokenType::True]) {
-            return Ok(Expr::Literal(LiteralExpr {
+            return Ok(Literal(Rc::new(LiteralExpr {
                 value: Some(Object::Bool(true)),
-            }));
+            })));
         }
 
         if self.is_match(&[TokenType::Nil]) {
-            return Ok(Expr::Literal(LiteralExpr {
+            return Ok(Literal(Rc::new(LiteralExpr {
                 value: Some(Object::Nil),
-            }));
+            })));
         }
 
         if self.is_match(&[TokenType::Number, TokenType::String]) {
-            return Ok(Expr::Literal(LiteralExpr {
+            return Ok(Literal(Rc::new(LiteralExpr {
                 value: Some(self.previous().literal.clone().unwrap()),
-            }));
+            })));
         }
 
         if self.is_match(&[TokenType::LeftParen]) {
-            let expr = self.expression()?;
+            let expr = Rc::new(self.expression()?);
             self.consume(TokenType::RightParen, "Expect ')' after expression.")?;
-            return Ok(Expr::Grouping(GroupingExpr {
-                expression: Box::new(expr),
-            }));
+            return Ok(Expr::Grouping(Rc::new(GroupingExpr {
+                expression: expr,
+            })));
         }
         if self.is_match(&[TokenType::Identifier]) {
-            return Ok(Expr::Variable(VariableExpr {
+            return Ok(Expr::Variable(Rc::new(VariableExpr {
                 name: self.previous().clone(),
-            }));
+            })));
         }
         Err(LoxResult::pares_error(
             self.peek().clone(),
@@ -499,11 +500,11 @@ impl<'a> Parser<'a> {
         while self.is_match(&[TokenType::BangEqual, TokenType::EqualEqual]) {
             let operator = self.previous().clone();
             let right = self.comparison()?;
-            expr = Binary(BinaryExpr {
-                left: Box::new(expr),
+            expr = Binary(Rc::new(BinaryExpr {
+                left: Rc::new(expr),
                 operator,
-                right: Box::new(right),
-            });
+                right: Rc::new(right),
+            }));
         }
 
         Ok(expr)

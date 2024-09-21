@@ -11,7 +11,7 @@ use std::rc::Rc;
 pub struct LoxFunction {
     name: Token,
     params: Rc<Vec<Token>>,
-    body: Rc<Vec<Stmt>>,
+    body: Rc<Vec<Rc<Stmt>>>,
     closure: Rc<RefCell<Environment>>,
 }
 
@@ -43,6 +43,6 @@ impl LoxCallable for LoxFunction {
     }
 
     fn to_string(&self) -> String {
-        format!("<fn {}>", self.name.lexeme)
+        self.name.lexeme.to_string()
     }
 }

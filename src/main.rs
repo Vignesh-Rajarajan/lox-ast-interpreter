@@ -13,6 +13,7 @@ mod function;
 mod interpreter;
 mod object;
 mod stmt;
+mod resolver;
 
 use crate::error::LoxResult;
 use crate::interpreter::Interpreter;

@@ -12,15 +12,15 @@ pub fn generate_ast(output_dir: &str) -> io::Result<()> {
     define_ast(
         output_dir,
         "Expr",
-        vec!["error", "token", "object"],
+        vec!["error", "token", "object", "rc"],
         vec![
-            "Assign: Token name, Box<Expr> value".to_string(),
-            "Binary: Box<Expr> left, Token operator, Box<Expr> right".to_string(),
-            "Call: Box<Expr> callee, Token paren, Vec<Expr> arguments".to_string(),
-            "Grouping: Box<Expr> expression".to_string(),
+            "Assign: Token name, Rc<Expr> value".to_string(),
+            "Binary: Rc<Expr> left, Token operator, Rc<Expr> right".to_string(),
+            "Call: Rc<Expr> callee, Token paren, Vec<Rc<Expr>> arguments".to_string(),
+            "Grouping: Rc<Expr> expression".to_string(),
             "Literal: Option<Object> value".to_string(),
-            "Logical: Box<Expr> left, Token operator, Box<Expr> right".to_string(),
-            "Unary: Token operator, Box<Expr> right".to_string(),
+            "Logical: Rc<Expr> left, Token operator, Rc<Expr> right".to_string(),
+            "Unary: Token operator, Rc<Expr> right".to_string(),
             "Variable : Token name".to_string(),
         ],
     )?;
@@ -30,15 +30,15 @@ pub fn generate_ast(output_dir: &str) -> io::Result<()> {
         "Stmt",
         vec!["error", "expr", "token", "rc"],
         vec![
-            "Block : Vec<Stmt> statements".to_string(),
-            "If : Expr condition, Box<Stmt> then_branch, Option<Box<Stmt>> else_branch".to_string(),
-            "Expression : Expr expression".to_string(),
-            "Function : Token name, Rc<Vec<Token>> params, Rc<Vec<Stmt>> body".to_string(),
+            "Block : Rc<Vec<Rc<Stmt>>> statements".to_string(),
+            "If : Rc<Expr> condition, Rc<Stmt> then_branch, Option<Rc<Stmt>> else_branch".to_string(),
+            "Expression : Rc<Expr> expression".to_string(),
+            "Function : Token name, Rc<Vec<Token>> params, Rc<Vec<Rc<Stmt>>> body".to_string(),
             "Break: Token token".to_string(),
-            "Print : Expr expression".to_string(),
-            "Return : Token token, Option<Expr> value".to_string(),
-            "Var : Token name, Option<Expr> initializer".to_string(),
-            "While : Expr condition, Box<Stmt> body".to_string(),
+            "Print : Rc<Expr> expression".to_string(),
+            "Return : Token token, Option<Rc<Expr>> value".to_string(),
+            "Var : Token name, Option<Rc<Expr>> initializer".to_string(),
+            "While : Rc<Expr> condition, Rc<Stmt> body".to_string(),
         ],
     )?;
 
@@ -61,10 +61,6 @@ fn define_ast(
             writeln!(file, "use crate::{}::*;", import)?;
         }
     }
-    // writeln!(file, "use crate::token::*;")?;
-    // writeln!(file, "use crate::error::*;")?;
-    // writeln!(file, "use crate::object::*;")?;
-    // writeln!(file, "use crate::expr::Expr;")?;
     for type_def in types {
         let (base_class_name, args) = type_def.split_once(':').unwrap();
         let class_name = format!("{}{}", base_class_name.trim(), base_name);
@@ -85,24 +81,57 @@ fn define_ast(
     for tree_type in &tree_types {
         writeln!(
             file,
-            "    {}({}),",
+            "    {}(Rc<{}>),",
             tree_type.base_class_name, tree_type.class_name
         )?;
     }
     writeln!(file, "}}")?;
 
+    writeln!(file, "impl PartialEq for {} {{", base_name)?;
+    writeln!(file, "    fn eq(&self, other: &Self) -> bool {{")?;
+    writeln!(file, "        match (self, other) {{")?;
+    for tree_type in &tree_types {
+        writeln!(
+            file,
+            "            ({0}::{1}(expr1), {0}::{1}(expr2)) => Rc::ptr_eq(expr1, expr2),",
+            base_name, tree_type.base_class_name
+        )?;
+    }
+    writeln!(file, "          _=> false,")?;
+    writeln!(file, "      }}")?;
+    writeln!(file, "  }}")?;
+
+    writeln!(file, "}}\n\nimpl Eq for {}{{}}\n", base_name)?;
+    writeln!(file,"use std::hash::*;")?;
+    writeln!(file, "impl Hash for {} {{",base_name)?;
+    writeln!(file,"    fn hash<H: Hasher>(&self, hasher: &mut H)")?;
+    writeln!(file,"    where H: Hasher, ")?;
+    writeln!(file,"       {{ match self {{")?;
+    for tree_type in &tree_types {
+        writeln!(
+            file,
+            "            {0}::{1}(expr) => {{hasher.write_usize(Rc::as_ptr(expr) as usize);}}",
+            base_name, tree_type.base_class_name
+        )?;
+    }
+    writeln!(file, "        }}")?;
+    writeln!(file,"    }}")?;
+    writeln!(file,"}}")?;
     writeln!(file, "impl {} {{", base_name)?;
     writeln!(
         file,
-        "    pub fn accept<T>(&self, visitor: &dyn {}Visitor<T>) -> Result<T, LoxResult> {{",
+        "    pub fn accept<T>(&self, wrapper: Rc<{}>, {}_visitor: &dyn {}Visitor<T>) -> Result<T, LoxResult> {{",
+        base_name,
+        base_name.to_lowercase(),
         base_name
     )?;
     writeln!(file, "        match self {{")?;
     for tree_type in &tree_types {
         writeln!(
             file,
-            "            {}::{}(expr) => expr.accept(visitor),",
-            base_name, tree_type.base_class_name
+            "            {0}::{1}(expr) => {3}_visitor.visit_{2}_{3}(wrapper,&expr),",
+            base_name,
+            tree_type.base_class_name, tree_type.base_class_name.to_lowercase(), base_name.to_lowercase()
         )?;
     }
     writeln!(file, "        }}")?;
@@ -121,30 +150,31 @@ fn define_ast(
     for tree_type in &tree_types {
         writeln!(
             file,
-            "    fn visit_{}_{}(&self, expr: &{}) -> Result<T,LoxResult>;",
+            "    fn visit_{0}_{1}(&self, wrapper: Rc<{3}>, {1}: &{2}) -> Result<T,LoxResult>;",
             tree_type.base_class_name.to_lowercase(),
             base_name.to_lowercase(),
-            tree_type.class_name
+            tree_type.class_name,
+            base_name
         )?;
     }
     writeln!(file, "}}")?;
-
-    for tree_type in &tree_types {
-        writeln!(file, "impl {} {{", tree_type.class_name)?;
-        writeln!(
-            file,
-            "    pub fn accept<T>(&self, visitor: &dyn {}Visitor<T>) -> Result<T, LoxResult> {{",
-            base_name
-        )?;
-        writeln!(
-            file,
-            "        visitor.visit_{}_{}(self)",
-            tree_type.base_class_name.to_lowercase(),
-            base_name.to_lowercase()
-        )?;
-        writeln!(file, "    }}")?;
-        writeln!(file, "}}")?;
-    }
+    //
+    // for tree_type in &tree_types {
+    //     writeln!(file, "impl {} {{", tree_type.class_name)?;
+    //     writeln!(
+    //         file,
+    //         "    pub fn accept<T>(&self, visitor: &dyn {}Visitor<T>) -> Result<T, LoxResult> {{",
+    //         base_name
+    //     )?;
+    //     writeln!(
+    //         file,
+    //         "        visitor.visit_{}_{}(self)",
+    //         tree_type.base_class_name.to_lowercase(),
+    //         base_name.to_lowercase()
+    //     )?;
+    //     writeln!(file, "    }}")?;
+    //     writeln!(file, "}}")?;
+    // }
     file.flush()?;
     Ok(())
 }

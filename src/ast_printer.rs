@@ -30,7 +30,6 @@
 //
 // impl ExprVisitor<String> for AstPrinter {
 //     fn visit_assign_expr(&self, expr: &AssignExpr) -> Result<String, LoxResult> {
-//         todo!()
 //     }
 //     fn visit_binary_expr(&self, expr: &BinaryExpr) -> Result<String, LoxResult> {
 //         self.parenthesize(expr.operator.lexeme.clone(), &[&expr.left, &expr.right])
@@ -47,7 +46,6 @@
 //     }
 //
 //     fn visit_logical_expr(&self, expr: &LogicalExpr) -> Result<String, LoxResult> {
-//         todo!()
 //     }
 //
 //     fn visit_unary_expr(&self, expr: &UnaryExpr) -> Result<String, LoxResult> {
@@ -55,6 +53,5 @@
 //     }
 //
 //     fn visit_variable_expr(&self, expr: &VariableExpr) -> Result<String, LoxResult> {
-//         todo!()
 //     }
 // }
