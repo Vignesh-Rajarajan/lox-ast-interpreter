@@ -14,6 +14,7 @@ use std::collections::HashMap;
 
 use std::ops::Deref;
 use std::rc::Rc;
+use crate::token::Token;
 
 pub struct Interpreter {
     pub globals: Rc<RefCell<Environment>>,
@@ -79,6 +80,17 @@ impl Interpreter {
     pub fn resolve(&self, expr: Rc<Expr>, depth: usize) {
         self.locals.borrow_mut().insert(expr, depth);
     }
+
+    fn lookup_variable(&self, name: &Token, expr: Rc<Expr>) -> Result<Object, LoxResult> {
+        if let Some(distance) = self.locals.borrow().get(&expr) {
+            self.environment
+                .borrow()
+                .borrow()
+                .get_at(*distance, &name.lexeme)
+        }else{
+            self.globals.borrow().get(name)
+        }
+    }
 }
 impl StmtVisitor<()> for Interpreter {
     fn visit_block_stmt(&self, wrapper: Rc<Stmt>, stmt: &BlockStmt) -> Result<(), LoxResult> {
@@ -140,12 +152,13 @@ impl StmtVisitor<()> for Interpreter {
         }
     }
 
-    fn visit_var_stmt(&self, wrapper: Rc<Stmt>, stmt: &VarStmt) -> Result<(), LoxResult> {
-        let value = if let Some(initializer) = &stmt.initializer {
-            self.evaluate(initializer.clone())?
+    fn visit_var_stmt(&self, _: Rc<Stmt>, stmt: &VarStmt) -> Result<(), LoxResult> {
+        let value = if let Some(initializer) = stmt.initializer.clone() {
+            self.evaluate(initializer)?
         } else {
             Object::Nil
         };
+
         self.environment
             .borrow()
             .borrow_mut()
@@ -164,12 +177,16 @@ impl StmtVisitor<()> for Interpreter {
 }
 
 impl ExprVisitor<Object> for Interpreter {
-    fn visit_assign_expr(&self, _: Rc<Expr>, expr: &AssignExpr) -> Result<Object, LoxResult> {
+    fn visit_assign_expr(&self, wrapper: Rc<Expr>, expr: &AssignExpr) -> Result<Object, LoxResult> {
         let value = self.evaluate(expr.value.clone())?;
-        self.environment
-            .borrow()
-            .borrow_mut()
-            .assign(&expr.name, value.clone())?;
+        if let Some(distance) = self.locals.borrow().get(&wrapper) {
+            self.environment
+                .borrow()
+                .borrow_mut()
+                .assign_at(*distance, &expr.name, value.clone())?;
+        }else{
+            self.globals.borrow_mut().assign(&expr.name, value.clone())?;
+        }
         Ok(value)
     }
 
@@ -341,8 +358,8 @@ impl ExprVisitor<Object> for Interpreter {
         }
     }
 
-    fn visit_variable_expr(&self, _: Rc<Expr>, expr: &VariableExpr) -> Result<Object, LoxResult> {
-        self.environment.borrow().borrow().get(&expr.name)
+    fn visit_variable_expr(&self, wrapper: Rc<Expr>, expr: &VariableExpr) -> Result<Object, LoxResult> {
+        self.lookup_variable(&expr.name, wrapper)
     }
 }
 
@@ -647,51 +664,20 @@ mod tests {
 
     #[test]
     fn test_var_statement() {
-        // let interpreter = Interpreter::new();
-        // let var_stmt = VarStmt {
-        //     name: Token::new(TokenType::Identifier, "a".to_string(), None, 1),
-        //     initializer: Some(Rc::new(Expr::Literal(LiteralExpr { value: Some(Object::Number(4.0)) }))),
-        // };
-        // let result = interpreter.visit_var_stmt(&Stmt::Block(BlockStmt { statements: vec![] }), &var_stmt);
-        // assert!(result.is_ok());
-        // let val = interpreter
-        //     .environment
-        //     .borrow()
-        //     .borrow()
-        //     .get(&var_stmt.name);
-        // assert_eq!(val.unwrap(), Object::Number(4.0));
+        let interpreter = Interpreter::new();
+        let var_stmt = VarStmt {
+            name: Token::new(TokenType::Identifier, "a".to_string(), None, 1),
+            initializer: Some(make_literal(Object::Number(4.0))),
+        };
+        let result = interpreter.visit_var_stmt(Rc::new(Stmt::Block(Rc::new(BlockStmt { statements: Rc::new(vec![]) }))), &var_stmt);
+        assert!(result.is_ok());
+        let val = interpreter
+            .environment
+            .borrow()
+            .borrow()
+            .get(&var_stmt.name);
+        assert_eq!(val.unwrap(), Object::Number(4.0));
     }
-    #[test]
-    fn test_var_statement_undefined() {
-        // let interpreter = Interpreter::new();
-        // let var_stmt = VarStmt {
-        //     name: Token::new(TokenType::Identifier, "a".to_string(), None, 1),
-        //     initializer: None,
-        // };
-        // let result = interpreter.visit_var_stmt(&Stmt::Block(BlockStmt { statements: &Rc::new(vec![]) }), &var_stmt);
-        // assert!(result.is_ok());
-        // let val = interpreter
-        //     .environment
-        //     .borrow()
-        //     .borrow()
-        //     .get(&var_stmt.name);
-        // assert_eq!(val.unwrap(), Object::Nil);
-    }
-    // #[test]
-    // fn test_var_expr() {
-    //     let interpreter = Interpreter::new();
-    //     let var_stmt = VarStmt {
-    //         name: Token::new(TokenType::Identifier, "a".to_string(), None, 1),
-    //         initializer: Some(Rc::new(Expr::Literal(LiteralExpr { value: Some(Object::Number(4.0)) }))),
-    //     };
-    //     let result = interpreter.visit_var_stmt(&Stmt::Block(BlockStmt { statements: vec![] }), &var_stmt);
-    //     assert!(result.is_ok());
-    //     let var_expr = VariableExpr {
-    //         name: Token::new(TokenType::Identifier, "a".to_string(), None, 1),
-    //     };
-    //     let val = interpreter.visit_variable_expr(&Rc::new(Expr::Variable(var_expr.clone())));
-    //     assert_eq!(val.unwrap(), Object::Number(4.0));
-    // }
     #[test]
     fn test_var_expr_undefined() {
         let interpreter = Interpreter::new();

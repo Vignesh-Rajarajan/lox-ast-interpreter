@@ -17,25 +17,3 @@ var c = "global c";
  print a;
  print b;
  print c;
- var x = 1;
- {
- var x = x+1;
- print x;
- }
- print x;
- if(4>3) {
-   print "true";
- } else {
-   print "false";
- }
-  if(2>3) {
-    print "true";
-  } else {
-    print "false";
-  }
-
-var n=5;
-while(n>0) {
-  print n;
-  n=n-1;
-}

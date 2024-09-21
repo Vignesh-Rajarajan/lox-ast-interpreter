@@ -124,7 +124,7 @@ impl<'a> ExprVisitor<()> for Resolver<'a> {
         {
             Err(LoxResult::runtime_error(
                 &expr.name,
-                "Can't read local variable in its own initizlier.",
+                "Can't read local variable in its own initializer.",
             ))
         } else {
             self.resolve_local(wrapper, &expr.name);

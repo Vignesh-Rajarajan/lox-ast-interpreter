@@ -20,6 +20,7 @@ use crate::interpreter::Interpreter;
 use crate::parser::Parser;
 use scanner::Scanner;
 use std::io::{self, BufRead};
+use std::rc::Rc;
 
 fn main() {
     let args: Vec<String> = args().collect();
@@ -81,7 +82,11 @@ impl Lox {
         let tokens = scanner.scan_tokens()?;
         let mut parser = Parser::new(tokens);
         let stmts = parser.parse()?;
-        if parser.success() && !self.interpreter.interpret(&stmts) {
+        if parser.success() {
+            let resolver = resolver::Resolver::new(&self.interpreter);
+            let s = Rc::new(stmts);
+            resolver.resolve(&Rc::clone(&s))?;
+            self.interpreter.interpret(&Rc::clone(&s));
             Ok(())
         } else {
             Err(LoxResult::GenericError {

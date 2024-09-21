@@ -158,23 +158,6 @@ fn define_ast(
         )?;
     }
     writeln!(file, "}}")?;
-    //
-    // for tree_type in &tree_types {
-    //     writeln!(file, "impl {} {{", tree_type.class_name)?;
-    //     writeln!(
-    //         file,
-    //         "    pub fn accept<T>(&self, visitor: &dyn {}Visitor<T>) -> Result<T, LoxResult> {{",
-    //         base_name
-    //     )?;
-    //     writeln!(
-    //         file,
-    //         "        visitor.visit_{}_{}(self)",
-    //         tree_type.base_class_name.to_lowercase(),
-    //         base_name.to_lowercase()
-    //     )?;
-    //     writeln!(file, "    }}")?;
-    //     writeln!(file, "}}")?;
-    // }
     file.flush()?;
     Ok(())
 }

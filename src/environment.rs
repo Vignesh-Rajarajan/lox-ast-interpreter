@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::rc::Rc;
+use crate::token_type::TokenType;
 
 pub struct Environment {
     values: HashMap<String, Object>,
@@ -30,7 +31,29 @@ impl Environment {
         self.values.insert(name, value);
     }
 
-    pub fn get(&self, name: &Token) -> Result<Object, LoxResult> {
+
+    pub fn get_at(&self, distance: usize, name: &str) -> Result<Object, LoxResult> {
+        if distance == 0 {
+            Ok(self.values.get(name).unwrap().clone())
+        }else{
+           self.enclosing.as_ref().unwrap().borrow().get_at(distance - 1, name)
+        }
+    }
+
+    pub fn assign_at(&mut self, distance: usize, name: &Token, value: Object) -> Result<(), LoxResult> {
+        if distance == 0 {
+            self.values.insert(name.lexeme.clone(), value);
+            Ok(())
+        }else{
+            self.enclosing
+                .as_ref()
+                .unwrap()
+                .borrow_mut()
+                .assign_at(distance - 1, name, value)
+        }
+    }
+
+pub fn get(&self, name: &Token) -> Result<Object, LoxResult> {
         if let Some(value) = self.values.get(name.lexeme.as_str()) {
             Ok(value.clone())
         } else if let Some(enclosing) = &self.enclosing {
@@ -42,7 +65,6 @@ impl Environment {
             ))
         }
     }
-
     pub fn assign(&mut self, name: &Token, value: Object) -> Result<(), LoxResult> {
         if let Entry::Occupied(mut object) = self.values.entry(name.lexeme.clone()) {
             object.insert(value);

@@ -1,3 +1,4 @@
+use std::fmt;
 use crate::error::LoxResult;
 use crate::interpreter::Interpreter;
 use crate::object::Object;
@@ -9,19 +10,22 @@ pub struct Callable {
     pub func: Rc<dyn LoxCallable>,
 }
 impl Debug for Callable {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<callable>")
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", LoxCallable::to_string(self))
     }
 }
 
 impl Display for Callable {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", LoxCallable::to_string(self))
     }
 }
 impl PartialEq for Callable {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.func, &other.func)
+        std::ptr::eq(
+            Rc::as_ptr(&self.func) as *const (),
+            Rc::as_ptr(&other.func) as *const (),
+        )
     }
 }
 pub trait LoxCallable {
